@@ -75,3 +75,99 @@ The recommended technical steps for the Upjet path are:
 
 - **RBAC:** Ensure the ServiceAccount running the Provider Pod has narrow permissions (only secrets and its own CRDs).
 - **AAP Scoping:** Use AAP Application Tokens instead of admin passwords, scoping the tokens to specific AAP Organizations to minimize the blast radius.
+
+---
+
+## 6. Build and Deploy on OpenShift
+
+This section describes how to **build** the AAP Crossplane provider, **deploy AAP** on OpenShift using the Red Hat Ansible Automation Platform Operator, then **deploy Crossplane and this provider** on the same (or another) OpenShift cluster so the provider can manage AAP resources declaratively.
+
+### 6.1 Build the provider
+
+From this repo, use the Upjet scaffold to generate and build the provider binary and CRDs:
+
+1. Clone the [upjet-provider-template](https://github.com/crossplane/upjet-provider-template), run `hack/prepare.sh` with AAP naming (see [hack/prepare-aap.sh](hack/prepare-aap.sh)), then copy in the scaffold from `provider/` and merge [provider/Makefile.aap](provider/Makefile.aap) into the provider repo’s Makefile.
+2. In the provider repo: `make generate.init`, `make generate`, then `make build`.
+
+Full steps, prerequisites, and troubleshooting: **[BUILD.md](BUILD.md)**.
+
+### 6.2 Deploy AAP on OpenShift (AAP Operator)
+
+Deploy Ansible Automation Platform on OpenShift using the official operator so you have an AAP API endpoint for the Crossplane provider to talk to.
+
+1. **Install the Ansible Automation Platform Operator** from OperatorHub (cluster-scoped, manual approval recommended):
+   - OpenShift Console → **Operators** → **OperatorHub** → search for **Ansible Automation Platform**.
+   - Install into a dedicated namespace (e.g. `aap`); choose a stable channel (e.g. `stable-2.4-cluster-scoped`).
+   - [Red Hat: Deploying the AAP Operator on OpenShift](https://docs.redhat.com/en/documentation/red_hat_ansible_automation_platform/2.4/html-single/deploying_the_red_hat_ansible_automation_platform_operator_on_openshift_container_platform/index).
+
+2. **Create an Automation controller instance** (the AAP controller):
+   - Create an `AutomationController` or equivalent CR in the operator’s namespace and configure storage, replicas, and TLS as needed.
+   - Wait for the controller to be ready and note the AAP URL (e.g. route or ingress) and admin credentials.
+
+3. **Create an AAP Application Token** (recommended for the Crossplane provider): In AAP UI, create a token scoped to the desired organization(s) and save it for the provider’s `ProviderConfig` Secret.
+
+### 6.3 Deploy Crossplane on OpenShift
+
+Install Crossplane in a dedicated namespace (e.g. `crossplane-system`). Prefer the **Helm** install with security context set so OpenShift accepts the pods:
+
+```bash
+oc new-project crossplane-system
+
+helm repo add crossplane-stable https://charts.crossplane.io/stable
+helm repo update
+
+helm install crossplane crossplane-stable/crossplane \
+  --namespace crossplane-system \
+  --set provider.packageRuntime.configuration.securityContext=false \
+  --wait
+```
+
+Alternatively, use the **Crossplane OpenShift Operator** (OLM) if available in your catalog. See [Crossplane on OpenShift](https://blog.crossplane.io/crossplane-openshift-operator-cloud-native-services/) and [Installing Crossplane on OpenShift](https://github.com/jeremycaine/crossplane-with-openshift) for variations and security context notes.
+
+Verify:
+
+```bash
+oc get pods -n crossplane-system
+```
+
+### 6.4 Deploy the AAP Crossplane provider
+
+1. **Install the provider** into the cluster (use the image you built from the scaffold, or push to a registry and reference it):
+   - Create a `Provider` resource that points to your provider image, or use `kubectl crossplane install provider` / the Crossplane CLI with the provider package.
+   - Ensure the provider’s ServiceAccount has RBAC that allows reading Secrets (in the namespace where the `ProviderConfig` secret lives) and managing the provider’s CRDs.
+
+2. **Create the AAP credentials Secret** in the same namespace as the provider (e.g. `crossplane-system`), with the AAP URL and token (or username/password). Example shape:
+
+   ```yaml
+   apiVersion: v1
+   kind: Secret
+   metadata:
+     name: aap-credentials
+     namespace: crossplane-system
+   type: Opaque
+   stringData:
+     credentials: '{"host":"https://aap.example.com","token":"YOUR_AAP_TOKEN"}'
+   ```
+
+   Use the AAP URL from the Automation controller route/ingress and an Application Token scoped to the right organization.
+
+3. **Create a ProviderConfig** that references this Secret (see [provider/examples/providerconfig.yaml](provider/examples/providerconfig.yaml)). Set `spec.credentials.secretRef` to the Secret name and key above.
+
+4. **Apply managed resources** (e.g. `Inventory`, `Group`, `Host`) that reference this `ProviderConfig`; the provider will reconcile them against the AAP API.
+
+### 6.5 Order of operations (summary)
+
+| Step | Action |
+|------|--------|
+| 1 | Build the provider from this repo’s scaffold ([BUILD.md](BUILD.md)). |
+| 2 | Deploy AAP on OpenShift via the AAP Operator; create controller instance and obtain AAP URL + token. |
+| 3 | Install Crossplane on OpenShift (Helm or OLM). |
+| 4 | Install the AAP Crossplane provider and create Secret + ProviderConfig. |
+| 5 | Create Crossplane MRs (Inventory, Group, etc.) and verify in the AAP UI. |
+
+### 6.6 References
+
+- [Deploying the AAP Operator on OpenShift](https://docs.redhat.com/en/documentation/red_hat_ansible_automation_platform/2.4/html-single/deploying_the_red_hat_ansible_automation_platform_operator_on_openshift_container_platform/index)
+- [Deploying AAP 2 on Red Hat OpenShift](https://docs.redhat.com/en/documentation/red_hat_ansible_automation_platform/2.4/html/deploying_ansible_automation_platform_2_on_red_hat_openshift/)
+- [Crossplane – OpenShift Operator](https://blog.crossplane.io/crossplane-openshift-operator-cloud-native-services/)
+- [BUILD.md](BUILD.md) (this repo)
