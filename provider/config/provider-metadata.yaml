@@ -1,0 +1,46 @@
+# Provider metadata for Upjet code generation.
+# name must match TERRAFORM_PROVIDER_SOURCE (e.g. ansible/aap).
+# Resources listed here can have description, examples, and argumentDocs used by the generator.
+# Schema is fetched at build time via make generate.init -> config/schema.json
+name: ansible/aap
+resources:
+  aap_group:
+    name: aap_group
+    title: AAP Group
+    description: Ansible Automation Platform Group (organization/team).
+    subCategory: ""
+    examples: []
+    argumentDocs: {}
+    importStatements: []
+  aap_host:
+    name: aap_host
+    title: AAP Host
+    description: A host in an AAP inventory.
+    subCategory: ""
+    examples: []
+    argumentDocs: {}
+    importStatements: []
+  aap_inventory:
+    name: aap_inventory
+    title: AAP Inventory
+    description: An AAP inventory.
+    subCategory: ""
+    examples: []
+    argumentDocs: {}
+    importStatements: []
+  aap_job:
+    name: aap_job
+    title: AAP Job
+    description: Launch an AAP job (job run).
+    subCategory: ""
+    examples: []
+    argumentDocs: {}
+    importStatements: []
+  aap_workflow_job:
+    name: aap_workflow_job
+    title: AAP Workflow Job
+    description: Launch an AAP workflow job.
+    subCategory: ""
+    examples: []
+    argumentDocs: {}
+    importStatements: []

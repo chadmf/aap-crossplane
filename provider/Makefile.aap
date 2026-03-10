@@ -1,0 +1,20 @@
+# ====================================================================================
+# AAP Crossplane Provider - Terraform provider variables
+# Merge these into the main Makefile of the provider repo (from upjet-provider-template)
+# after running hack/prepare.sh with PROVIDER_NAME_LOWER=aap, etc.
+# ====================================================================================
+# Project (adjust ORGANIZATION_NAME to your GitHub org if different)
+PROJECT_NAME ?= provider-aap
+PROJECT_REPO ?= github.com/crossplane-contrib/$(PROJECT_NAME)
+
+# Terraform Ansible Automation Platform provider (ansible/aap)
+# See: https://registry.terraform.io/providers/ansible/aap/latest
+# Releases: https://github.com/ansible/terraform-provider-aap/releases
+export TERRAFORM_PROVIDER_SOURCE ?= ansible/aap
+export TERRAFORM_PROVIDER_REPO ?= https://github.com/ansible/terraform-provider-aap
+export TERRAFORM_PROVIDER_VERSION ?= 0.4.0
+export TERRAFORM_PROVIDER_DOWNLOAD_NAME ?= terraform-provider-aap
+# Community provider: download from GitHub releases (adjust version to match above)
+export TERRAFORM_PROVIDER_DOWNLOAD_URL_PREFIX ?= https://github.com/ansible/terraform-provider-aap/releases/download/v$(TERRAFORM_PROVIDER_VERSION)
+export TERRAFORM_NATIVE_PROVIDER_BINARY ?= terraform-provider-aap_v$(TERRAFORM_PROVIDER_VERSION)
+export TERRAFORM_DOCS_PATH ?= docs/resources
