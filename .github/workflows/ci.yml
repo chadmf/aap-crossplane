@@ -1,0 +1,47 @@
+# Test and validate scaffold code: shell scripts, YAML, and Markdown.
+# The Go config in provider/config/ is intended to be copied into upjet-provider-template
+# and built there; this workflow validates the scaffold assets in this repo.
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  validate:
+    name: Validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: ShellCheck (shell scripts)
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y shellcheck
+          find hack -maxdepth 1 -name '*.sh' -exec shellcheck {} +
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install yamllint
+        run: pip install yamllint
+
+      - name: Validate YAML
+        run: yamllint -d relaxed provider/config provider/examples
+
+      - name: Set up Node.js (for markdownlint)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install markdownlint-cli
+        run: npm install -g markdownlint-cli@0.40.0
+
+      - name: Lint Markdown
+        run: markdownlint README.md BUILD.md provider/README.md
+        continue-on-error: true
