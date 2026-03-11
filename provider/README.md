@@ -2,6 +2,10 @@
 
 This directory contains the scaffolding used to build the **Crossplane provider for Ansible Automation Platform (AAP)** from the [Upjet provider template](https://github.com/crossplane/upjet-provider-template). It is not a standalone Go module; copy these files into a clone of the template after running `hack/prepare.sh`.
 
+## TL;DR Full build steps
+
+[BUILD.md](../BUILD.md) in the repo root has the instructions to build and deploy the provider.
+
 ## Contents
 
 | Path | Description |
@@ -24,6 +28,4 @@ This directory contains the scaffolding used to build the **Crossplane provider 
 
 Schema and CRD field details come from the [Terraform provider ansible/aap](https://registry.terraform.io/providers/ansible/aap/latest) when you run `make generate.init` and `make generate` in the provider repo.
 
-## Full build steps
-
-See [BUILD.md](../BUILD.md) in the repo root.
+#
