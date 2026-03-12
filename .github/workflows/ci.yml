@@ -1,6 +1,4 @@
-# Test and validate scaffold code: shell scripts, YAML, and Markdown.
-# The Go config in provider/config/ is intended to be copied into upjet-provider-template
-# and built there; this workflow validates the scaffold assets in this repo.
+# Validate scaffold and build the provider from the template + this scaffold.
 name: CI
 
 on:
@@ -43,4 +41,70 @@ jobs:
 
       - name: Lint Markdown
         run: markdownlint README.md BUILD.md provider/README.md
+        continue-on-error: true
+
+  build:
+    name: Build provider
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout scaffold
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+
+      - name: Install goimports
+        run: |
+          go install golang.org/x/tools/cmd/goimports@latest
+          echo "GOIMPORTS_BIN=$(go env GOPATH)/bin" >> $GITHUB_ENV
+          echo "PATH=$PATH:$(go env GOPATH)/bin" >> $GITHUB_ENV
+
+      - name: Clone Upjet provider template
+        run: |
+          git clone --depth 1 https://github.com/crossplane/upjet-provider-template.git provider-aap
+          cd provider-aap
+          make submodules
+
+      - name: Prepare AAP provider
+        working-directory: provider-aap
+        run: |
+          PROVIDER_NAME_LOWER=aap \
+          PROVIDER_NAME_NORMAL=AAP \
+          ORGANIZATION_NAME=crossplane-contrib \
+          CRD_ROOT_GROUP=crossplane.io \
+          ./hack/prepare.sh
+
+      - name: Apply scaffold
+        run: |
+          cp -r provider/config/* provider-aap/config/
+          cp provider/Makefile.aap provider-aap/Makefile.aap
+          # Insert -include Makefile.aap after TERRAFORM_VERSION_VALID block
+          awk '/^TERRAFORM_VERSION_VALID :=/ { print; getline; print; print ""; print "# AAP Terraform provider (override template defaults)"; print "-include Makefile.aap"; next } { print }' provider-aap/Makefile > provider-aap/Makefile.tmp && mv provider-aap/Makefile.tmp provider-aap/Makefile
+
+      - name: Generate schema and code
+        working-directory: provider-aap
+        run: |
+          make generate.init
+          make generate || true
+
+      - name: Apply post-generate fixes
+        run: |
+          chmod +x hack/apply-post-generate-fixes.sh
+          hack/apply-post-generate-fixes.sh "${{ github.workspace }}" "${{ github.workspace }}/provider-aap"
+
+      - name: Run controller-gen and angryjet
+        working-directory: provider-aap
+        run: |
+          go run -tags generate sigs.k8s.io/controller-tools/cmd/controller-gen object:headerFile=./hack/boilerplate.go.txt paths=./apis/... crd:allowDangerousTypes=true,crdVersions=v1 output:artifacts:config=./package/crds
+          go run -tags generate github.com/crossplane/crossplane-tools/cmd/angryjet generate-methodsets --header-file=./hack/boilerplate.go.txt ./apis/...
+
+      - name: Build provider
+        working-directory: provider-aap
+        run: make build
+
+      - name: Test
+        working-directory: provider-aap
+        run: make test
         continue-on-error: true
