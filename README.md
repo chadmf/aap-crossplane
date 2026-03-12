@@ -1,8 +1,30 @@
 # Crossplane Provider for Ansible Automation Platform
 
 
-## TL;DR 
+## TL;DR
+
 This is a prototype for creating a crossplane provider for the Ansible Automation Platform(AAP). The architecture design for creating a Crossplane Provider for the AAP is structured around bridging Kubernetes' declarative model with Ansible's task-driven execution.
+
+## Table of Contents
+
+
+- [TL;DR](#tldr)
+- [1. Architectural Choice: Upjet vs. Native Go Provider](#1-architectural-choice-upjet-vs-native-go-provider)
+- [2. Component Architecture](#2-component-architecture)
+  - [Managed Resources (MRs)](#managed-resources-mrs)
+  - [ProviderConfig](#providerconfig)
+  - [Reconciler Loop](#reconciler-loop)
+- [3. Handling the "Ansible Problem" (State vs. Action)](#3-handling-the-ansible-problem-state-vs-action)
+- [4. Implementation Workflow (Upjet Approach)](#4-implementation-workflow-upjet-approach)
+- [5. Security Architecture](#5-security-architecture)
+- [6. Build and Deploy on OpenShift](#6-build-and-deploy-on-openshift)
+  - [6.1 Build the provider](#61-build-the-provider)
+  - [6.2 Deploy AAP on OpenShift (AAP Operator)](#62-deploy-aap-on-openshift-aap-operator)
+  - [6.3 Deploy Crossplane on OpenShift](#63-deploy-crossplane-on-openshift)
+  - [6.4 Deploy the AAP Crossplane provider](#64-deploy-the-aap-crossplane-provider)
+  - [6.5 Order of operations (summary)](#65-order-of-operations-summary)
+  - [6.6 References](#66-references)
+- [Workflows (CI)](workflows.md)
 
 ---
 
