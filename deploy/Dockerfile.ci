@@ -14,16 +14,21 @@
 FROM golang:1.24-bookworm AS builder
 
 ENV PATH="${PATH}:/go/bin"
+# Avoid @latest: newer golang.org/x/tools can require a Go version newer than this image (go install exits 1).
+ENV CGO_ENABLED=0
+ENV GOPROXY=https://proxy.golang.org,direct
 
-# git/make/curl/unzip + goimports (golang.org/x/tools) in one layer
+ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     make \
     ca-certificates \
     curl \
     unzip \
-    && rm -rf /var/lib/apt/lists/* \
-    && go install golang.org/x/tools/cmd/goimports@latest
+    && rm -rf /var/lib/apt/lists/*
+
+# Pin x/tools to a release that builds with Go 1.24 (bump when base image Go version bumps).
+RUN go install golang.org/x/tools/cmd/goimports@v0.24.0
 
 WORKDIR /workspace
 COPY . .
