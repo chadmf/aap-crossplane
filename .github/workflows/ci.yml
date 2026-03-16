@@ -59,4 +59,4 @@ jobs:
       - name: Build container (Podman)
         env:
           PROVIDER_AAP_DIR: ${{ github.workspace }}/provider-aap
-        run: ./deploy/build-provider-image-podman.sh provider-aap:latest
+        run: deploy/build-provider-image-podman.sh provider-aap:latest
