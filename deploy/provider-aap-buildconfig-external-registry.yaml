@@ -1,0 +1,55 @@
+# Build the AAP Crossplane provider image on OpenShift and push to an EXTERNAL registry.
+# Use this when the cluster's internal image registry is not available
+# (avoids "InvalidOutputReference: Output image could not be resolved").
+#
+# 1. Create a push secret for your registry (e.g. quay.io, ghcr.io, or internal registry):
+#    oc create secret generic provider-aap-push-secret -n crossplane-system \
+#      --from-file=.dockerconfigjson=$HOME/.docker/config.json \
+#    Or: oc create secret docker-registry provider-aap-push-secret -n crossplane-system \
+#      --docker-server=<registry> --docker-username=<user> --docker-password=<token>
+#
+# 2. Replace OUTPUT_IMAGE below with your image (e.g. quay.io/myorg/provider-aap:latest).
+#
+# 3. Apply: kubectl apply -f deploy/provider-aap-buildconfig-external-registry.yaml
+#
+# 4. Run: ./deploy/build-provider-openshift.sh
+#
+# 5. Set deploy/provider.yaml spec.package to OUTPUT_IMAGE.
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: provider-aap
+  namespace: crossplane-system
+spec:
+  source:
+    type: Binary
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: Dockerfile
+      buildArgs:
+        - name: TARGETOS
+          value: "linux"
+        - name: TARGETARCH
+          value: "amd64"
+        - name: TERRAFORM_VERSION
+          value: "1.5.7"
+        - name: TERRAFORM_PROVIDER_SOURCE
+          value: "ansible/aap"
+        - name: TERRAFORM_PROVIDER_VERSION
+          value: "1.4.0"
+        - name: TERRAFORM_PROVIDER_DOWNLOAD_NAME
+          value: "terraform-provider-aap"
+        - name: TERRAFORM_PROVIDER_DOWNLOAD_URL_PREFIX
+          value: "https://github.com/ansible/terraform-provider-aap/releases/download/v1.4.0"
+        - name: TERRAFORM_NATIVE_PROVIDER_BINARY
+          value: "terraform-provider-aap_v1.4.0"
+  output:
+    to:
+      kind: DockerImage
+      # Replace with your registry and image (must be pushable by the build service account):
+      name: quay.io/myorg/provider-aap:latest
+    pushSecret:
+      name: provider-aap-push-secret
+  runPolicy: Serial

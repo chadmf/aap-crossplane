@@ -1,0 +1,48 @@
+# Build the AAP Crossplane provider image on OpenShift (internal registry).
+# 1. Apply this file: kubectl apply -f deploy/provider-aap-buildconfig.yaml
+# 2. Run: ./deploy/build-provider-openshift.sh
+# The image will be available as image-registry.openshift-image-registry.svc:5000/<namespace>/provider-aap:latest
+---
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: provider-aap
+  namespace: crossplane-system
+spec:
+  lookupPolicy:
+    local: true
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: provider-aap
+  namespace: crossplane-system
+spec:
+  source:
+    type: Binary
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: Dockerfile
+      buildArgs:
+        - name: TARGETOS
+          value: "linux"
+        - name: TARGETARCH
+          value: "amd64"
+        - name: TERRAFORM_VERSION
+          value: "1.5.7"
+        - name: TERRAFORM_PROVIDER_SOURCE
+          value: "ansible/aap"
+        - name: TERRAFORM_PROVIDER_VERSION
+          value: "1.4.0"
+        - name: TERRAFORM_PROVIDER_DOWNLOAD_NAME
+          value: "terraform-provider-aap"
+        - name: TERRAFORM_PROVIDER_DOWNLOAD_URL_PREFIX
+          value: "https://github.com/ansible/terraform-provider-aap/releases/download/v1.4.0"
+        - name: TERRAFORM_NATIVE_PROVIDER_BINARY
+          value: "terraform-provider-aap_v1.4.0"
+  output:
+    to:
+      kind: ImageStreamTag
+      name: provider-aap:latest
+  runPolicy: Serial

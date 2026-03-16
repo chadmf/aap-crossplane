@@ -1,0 +1,16 @@
+# Example Inventory managed resource for the AAP Crossplane provider.
+# Apply after the provider is running (in-cluster or locally via make run).
+# Uses the default ProviderConfig (aap-credentials in crossplane-system).
+# Organization ID 1 is typically the default AAP organization.
+---
+apiVersion: aap.aap.crossplane.io/v1alpha1
+kind: Inventory
+metadata:
+  name: example-inventory
+spec:
+  forProvider:
+    name: crossplane-example-inventory
+    organization: 1
+  providerConfigRef:
+    name: default
+  deletionPolicy: Delete

@@ -1,12 +1,10 @@
 # Crossplane Provider for Ansible Automation Platform
 
-
 ## TL;DR
 
 This is a prototype for creating a crossplane provider for the Ansible Automation Platform(AAP). The architecture design for creating a Crossplane Provider for the AAP is structured around bridging Kubernetes' declarative model with Ansible's task-driven execution.
 
 ## Table of Contents
-
 
 - [TL;DR](#tldr)
 - [1. Architectural Choice: Upjet vs. Native Go Provider](#1-architectural-choice-upjet-vs-native-go-provider)
@@ -33,7 +31,7 @@ This is a prototype for creating a crossplane provider for the Ansible Automatio
 The recommendation is to start with **Upjet** due to the existing robust Terraform provider for AAP, which allows for instant generation of the majority of Crossplane Custom Resource Definitions (CRDs).
 
 | Feature | Upjet (Terraform-Based) | Native (Go + Crossplane SDK) |
-|---------|-------------------------|------------------------------|
+| --- | --- | --- |
 | **Effort** | Low (Weeks) | High (Months) |
 | **Logic Source** | Reuses Terraform Ansible Provider | Direct interaction with AAP REST API |
 | **State** | Manages a `.tfstate` in K8s Secrets | No state file; queries AAP directly |
@@ -84,7 +82,7 @@ The biggest challenge is that Crossplane provisions **state** ("This Job Templat
 The recommended technical steps for the Upjet path are:
 
 | Step | Action |
-|------|--------|
+| --- | --- |
 | **Initialize** | Use the [upjet-provider-template](https://github.com/upbound/upjet-provider-template) repository. |
 | **Configure** | Point the generator to the existing Terraform provider for Ansible. |
 | **Map** | Define which Terraform resources map to which K8s groups (e.g., `job.ansible.upbound.io`). |
@@ -146,6 +144,8 @@ helm install crossplane crossplane-stable/crossplane \
 
 Alternatively, use the **Crossplane OpenShift Operator** (OLM) if available in your catalog. See [Crossplane on OpenShift](https://blog.crossplane.io/crossplane-openshift-operator-cloud-native-services/) and [Installing Crossplane on OpenShift](https://github.com/jeremycaine/crossplane-with-openshift) for variations and security context notes.
 
+**OpenShift:** Use the Helm values file [deploy/crossplane-values-openshift.yaml](deploy/crossplane-values-openshift.yaml) so Crossplane pods run with UIDs in the cluster’s restricted range; no SCC grants (e.g. `anyuid`) are required. See [deploy/openshift-deploy.md](deploy/openshift-deploy.md) for the full OpenShift deploy guide.
+
 Verify:
 
 ```bash
@@ -158,7 +158,7 @@ oc get pods -n crossplane-system
    - Create a `Provider` resource that points to your provider image, or use `kubectl crossplane install provider` / the Crossplane CLI with the provider package.
    - Ensure the provider’s ServiceAccount has RBAC that allows reading Secrets (in the namespace where the `ProviderConfig` secret lives) and managing the provider’s CRDs.
 
-2. **Create the AAP credentials Secret** in the same namespace as the provider (e.g. `crossplane-system`), with the AAP URL and token (or username/password). Example shape:
+2. **Create the AAP credentials Secret** in the same namespace as the provider (e.g. `crossplane-system`), with the AAP URL and an Application Token (recommended; or username/password). Example shape:
 
    ```yaml
    apiVersion: v1
@@ -180,7 +180,7 @@ oc get pods -n crossplane-system
 ### 6.5 Order of operations (summary)
 
 | Step | Action |
-|------|--------|
+| --- | --- |
 | 1 | Build the provider from this repo’s scaffold ([BUILD.md](BUILD.md)). |
 | 2 | Deploy AAP on OpenShift via the AAP Operator; create controller instance and obtain AAP URL + token. |
 | 3 | Install Crossplane on OpenShift (Helm or OLM). |

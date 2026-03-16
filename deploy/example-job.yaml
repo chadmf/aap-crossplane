@@ -1,0 +1,30 @@
+# Example Job managed resource: launch an AAP job from an existing job template.
+#
+# The provider does not have a CRD to *create* a job template in AAP. Job templates
+# must exist in AAP (created via UI, API, or automation). This example *launches*
+# a job run using an existing job template (by ID).
+#
+# Apply after the provider is running and ProviderConfig/Secret are in place.
+# Replace jobTemplateId (and optionally inventoryId) with IDs from your AAP instance.
+---
+apiVersion: job.aap.crossplane.io/v1alpha1
+kind: Job
+metadata:
+  name: example-job-run
+spec:
+  forProvider:
+    # Required: ID of the job template in AAP (get from AAP UI or API).
+    jobTemplateId: 7
+    # Optional: inventory to run against (omit to use template default or prompt).
+    inventoryId: 1
+    # Optional: extra variables (JSON or YAML string).
+    extraVars: '{"my_var": "value"}'
+    # Optional: wait for job to reach a final state before reconciler continues.
+    waitForCompletion: false
+    waitForCompletionTimeoutSeconds: 120
+    # Optional: when any value here changes, a new job is launched (useful for re-runs).
+    triggers:
+      launched_at: "2025-01-01"
+  providerConfigRef:
+    name: default
+  deletionPolicy: Orphan   # Deleting this CR does not cancel/delete the job in AAP

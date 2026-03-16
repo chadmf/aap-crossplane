@@ -1,0 +1,35 @@
+# Crossplane Helm values for OpenShift.
+# Uses UIDs in the namespace's allocated range so pods satisfy the restricted
+# Security Context Constraint without granting anyuid.
+#
+# OpenShift allocates runAsUser from a namespace range (e.g. 1000160000-1000169999).
+# Adjust the UID if your cluster uses a different range (check an existing pod's spec).
+#
+provider:
+  packageRuntime:
+    configuration:
+      securityContext: false
+
+# Crossplane controller: run as a non-root UID in OpenShift's range
+securityContextCrossplane:
+  runAsUser: 1000160000
+  runAsGroup: 1000160000
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+
+podSecurityContextCrossplane:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+
+# RBAC Manager: same UID range so it passes restricted SCC
+securityContextRBACManager:
+  runAsUser: 1000160000
+  runAsGroup: 1000160000
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+
+podSecurityContextRBACManager:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault

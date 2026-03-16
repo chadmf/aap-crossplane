@@ -1,0 +1,3 @@
+# Local Helm cache and downloaded binary (see deploy/openshift-deploy.md)
+.helm/
+/helm

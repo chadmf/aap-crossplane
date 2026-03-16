@@ -27,5 +27,3 @@ This directory contains the scaffolding used to build the **Crossplane provider 
 - `aap_workflow_job` → WorkflowJob
 
 Schema and CRD field details come from the [Terraform provider ansible/aap](https://registry.terraform.io/providers/ansible/aap/latest) when you run `make generate.init` and `make generate` in the provider repo.
-
-#
