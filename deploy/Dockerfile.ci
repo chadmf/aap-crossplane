@@ -7,19 +7,23 @@
 # -----------------------------------------------------------------------------
 # Stage 1: Clone template, apply scaffold, generate, build provider binary
 # -----------------------------------------------------------------------------
+# Official golang images do not ship goimports (Upjet’s make generate expects it).
+# No common public Go CI image includes it preinstalled; install it once with apt deps.
+# Optional: maintain e.g. your-registry/golang-goimports:1.24 (FROM golang:1.24-bookworm +
+#   RUN go install golang.org/x/tools/cmd/goimports@latest) and set FROM here, then drop go install.
 FROM golang:1.24-bookworm AS builder
 
-# Tools for make submodules, generate.init (terraform download), and awk
+ENV PATH="${PATH}:/go/bin"
+
+# git/make/curl/unzip + goimports (golang.org/x/tools) in one layer
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     make \
     ca-certificates \
     curl \
     unzip \
-    && rm -rf /var/lib/apt/lists/*
-
-RUN go install golang.org/x/tools/cmd/goimports@latest
-ENV PATH="${PATH}:/go/bin"
+    && rm -rf /var/lib/apt/lists/* \
+    && go install golang.org/x/tools/cmd/goimports@latest
 
 WORKDIR /workspace
 COPY . .
