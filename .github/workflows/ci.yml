@@ -1,13 +1,9 @@
-# Test and validate scaffold code: shell scripts, YAML, and Markdown.
-# The Go config in provider/config/ is intended to be copied into upjet-provider-template
-# and built there; this workflow validates the scaffold assets in this repo.
+# Validate scaffold: shell scripts, YAML, and Markdown.
 name: CI
 
 on:
   push:
-    branches: [main, master]
   pull_request:
-    branches: [main, master]
 
 jobs:
   validate:

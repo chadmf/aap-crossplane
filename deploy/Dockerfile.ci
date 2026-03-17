@@ -1,0 +1,123 @@
+# Build the AAP Crossplane provider entirely inside the container.
+# Build context: aap-crossplane repo root (provider/, hack/, deploy/).
+#
+# Usage: podman build -f deploy/Dockerfile.ci -t provider-aap:latest .
+# Or:    docker build -f deploy/Dockerfile.ci -t provider-aap:latest .
+
+# -----------------------------------------------------------------------------
+# Stage 1: Clone template, apply scaffold, generate, build provider binary
+# -----------------------------------------------------------------------------
+# Official golang images do not ship goimports (Upjet’s make generate expects it).
+# No common public Go CI image includes it preinstalled; install it once with apt deps.
+# Optional: maintain e.g. your-registry/golang-goimports:1.24 (FROM golang:1.24-bookworm +
+#   RUN go install golang.org/x/tools/cmd/goimports@latest) and set FROM here, then drop go install.
+FROM golang:1.24-bookworm AS builder
+
+ENV PATH="${PATH}:/go/bin"
+# Avoid @latest: newer golang.org/x/tools can require a Go version newer than this image (go install exits 1).
+ENV CGO_ENABLED=0
+ENV GOPROXY=https://proxy.golang.org,direct
+
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    make \
+    ca-certificates \
+    curl \
+    unzip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Pin x/tools to a release that builds with Go 1.24 (bump when base image Go version bumps).
+RUN go install golang.org/x/tools/cmd/goimports@v0.24.0
+
+WORKDIR /workspace
+COPY . .
+
+# Full clone (not --depth 1): shallow trees + submodules break prepare.sh git grep/git clean in some environments (exit 128).
+# Trust repo dir so Git 2.35+ does not fail with "detected dubious ownership" during prepare.
+RUN git config --global --add safe.directory '*'
+
+RUN git clone https://github.com/crossplane/upjet-provider-template.git provider-aap \
+    && cd provider-aap && make submodules
+
+RUN cd provider-aap && \
+    PROVIDER_NAME_LOWER=aap \
+    PROVIDER_NAME_NORMAL=AAP \
+    ORGANIZATION_NAME=crossplane-contrib \
+    CRD_ROOT_GROUP=crossplane.io \
+    ./hack/prepare.sh
+
+# Apply scaffold: config, Makefile.aap, merge into main Makefile
+RUN cp -r provider/config/* provider-aap/config/ \
+    && cp provider/Makefile.aap provider-aap/Makefile.aap \
+    && awk '/^TERRAFORM_VERSION_VALID :=/ { print; getline; print; print ""; print "# AAP Terraform provider (override template defaults)"; print "-include Makefile.aap"; next } { print }' \
+       provider-aap/Makefile > provider-aap/Makefile.tmp \
+    && mv provider-aap/Makefile.tmp provider-aap/Makefile
+
+# Generate schema and code (terraform is downloaded by make when needed)
+RUN cd provider-aap && make generate.init && make generate || true
+
+# Post-generate fixes and controller-gen + angryjet
+RUN chmod +x hack/apply-post-generate-fixes.sh \
+    && hack/apply-post-generate-fixes.sh /workspace /workspace/provider-aap
+
+RUN cd provider-aap && \
+    go run -tags generate sigs.k8s.io/controller-tools/cmd/controller-gen \
+        object:headerFile=./hack/boilerplate.go.txt paths=./apis/... \
+        crd:allowDangerousTypes=true,crdVersions=v1 output:artifacts:config=./package/crds && \
+    go run -tags generate github.com/crossplane/crossplane-tools/cmd/angryjet generate-methodsets \
+        --header-file=./hack/boilerplate.go.txt ./apis/...
+
+# Build provider binary for linux/amd64 (CI runner arch)
+ENV GOOS=linux GOARCH=amd64
+RUN cd provider-aap && go build -o _output/bin/linux_amd64/provider ./cmd/provider
+
+# -----------------------------------------------------------------------------
+# Stage 2: Provider runtime image (matches template cluster/images/.../Dockerfile)
+# -----------------------------------------------------------------------------
+FROM alpine:3.23.2
+RUN apk --no-cache add ca-certificates bash unzip
+
+ARG TERRAFORM_VERSION=1.5.7
+ARG TERRAFORM_PROVIDER_SOURCE=ansible/aap
+ARG TERRAFORM_PROVIDER_VERSION=1.4.0
+ARG TERRAFORM_PROVIDER_DOWNLOAD_NAME=terraform-provider-aap
+ARG TERRAFORM_NATIVE_PROVIDER_BINARY=terraform-provider-aap_v1.4.0
+ARG TERRAFORM_PROVIDER_DOWNLOAD_URL_PREFIX=https://github.com/ansible/terraform-provider-aap/releases/download/v1.4.0
+
+ENV TARGETOS=linux
+ENV TARGETARCH=amd64
+
+ENV PLUGIN_DIR=/terraform/provider-mirror/registry.terraform.io/${TERRAFORM_PROVIDER_SOURCE}/${TERRAFORM_PROVIDER_VERSION}/${TARGETOS}_${TARGETARCH}
+ENV TF_CLI_CONFIG_FILE=/terraform/.terraformrc
+ENV TF_FORK=0
+ENV USER_ID=65532
+
+RUN mkdir -p ${PLUGIN_DIR}
+
+# Terraform and AAP provider zips (URLs match Makefile.aap / script)
+ADD https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_${TARGETOS}_${TARGETARCH}.zip /tmp/
+ADD ${TERRAFORM_PROVIDER_DOWNLOAD_URL_PREFIX}/${TERRAFORM_PROVIDER_DOWNLOAD_NAME}_${TERRAFORM_PROVIDER_VERSION}_${TARGETOS}_${TARGETARCH}.zip /tmp/
+
+# terraformrc.hcl from template (provider-mirror layout)
+COPY --from=builder /workspace/provider-aap/cluster/images/provider-aap/terraformrc.hcl /terraform/.terraformrc
+
+RUN unzip /tmp/terraform_${TERRAFORM_VERSION}_${TARGETOS}_${TARGETARCH}.zip -d /usr/local/bin \
+    && chmod +x /usr/local/bin/terraform \
+    && rm /tmp/terraform_${TERRAFORM_VERSION}_${TARGETOS}_${TARGETARCH}.zip \
+    && unzip /tmp/${TERRAFORM_PROVIDER_DOWNLOAD_NAME}_${TERRAFORM_PROVIDER_VERSION}_${TARGETOS}_${TARGETARCH}.zip -d ${PLUGIN_DIR} \
+    && chmod +x ${PLUGIN_DIR}/* \
+    && rm /tmp/${TERRAFORM_PROVIDER_DOWNLOAD_NAME}_${TERRAFORM_PROVIDER_VERSION}_${TARGETOS}_${TARGETARCH}.zip \
+    && chown -R ${USER_ID}:${USER_ID} /terraform
+
+COPY --from=builder /workspace/provider-aap/_output/bin/linux_amd64/provider /usr/local/bin/provider
+RUN chown ${USER_ID}:${USER_ID} /usr/local/bin/provider
+
+ENV TERRAFORM_VERSION=${TERRAFORM_VERSION}
+ENV TERRAFORM_PROVIDER_SOURCE=${TERRAFORM_PROVIDER_SOURCE}
+ENV TERRAFORM_PROVIDER_VERSION=${TERRAFORM_PROVIDER_VERSION}
+ENV TERRAFORM_NATIVE_PROVIDER_PATH=${PLUGIN_DIR}/${TERRAFORM_NATIVE_PROVIDER_BINARY}
+
+USER ${USER_ID}
+EXPOSE 8080
+ENTRYPOINT ["provider"]

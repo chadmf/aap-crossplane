@@ -1,0 +1,127 @@
+# Validate that the AAP Crossplane provider's APIs align with the running AAP instance.
+#
+# This Job calls the AAP API (with token from aap-credentials), discovers available
+# v2 endpoints, and compares them to the provider's managed resources.
+#
+# Run:
+#   kubectl apply -f deploy/validate-aap-provider-api-alignment.yaml
+#   kubectl wait --for=condition=complete job/validate-aap-provider-api -n crossplane-system --timeout=90s
+#   kubectl logs job/validate-aap-provider-api -n crossplane-system
+#
+# Requires: aap-credentials secret in crossplane-system (token-based).
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: validate-aap-provider-api
+  namespace: crossplane-system
+spec:
+  ttlSecondsAfterFinished: 600
+  backoffLimit: 1
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: validate
+          image: curlimages/curl:latest
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              CRED_FILE="/etc/aap-credentials/credentials"
+              if [ ! -f "$CRED_FILE" ]; then
+                echo "ERROR: Secret not mounted at $CRED_FILE"
+                exit 1
+              fi
+              RAW=$(cat "$CRED_FILE")
+              HOST=$(echo "$RAW" | sed -n 's/.*"host"\s*:\s*"\([^"]*\)".*/\1/p')
+              TOKEN=$(echo "$RAW" | sed -n 's/.*"token"\s*:\s*"\([^"]*\)".*/\1/p')
+              USER=$(echo "$RAW" | sed -n 's/.*"username"\s*:\s*"\([^"]*\)".*/\1/p')
+              PASS=$(echo "$RAW" | sed -n 's/.*"password"\s*:\s*"\([^"]*\)".*/\1/p')
+              if [ -z "$HOST" ]; then
+                echo "ERROR: Could not parse host from credentials"
+                exit 1
+              fi
+              AUTH=""
+              if [ -n "$TOKEN" ]; then
+                AUTH="Authorization: Bearer $TOKEN"
+              elif [ -n "$USER" ] && [ -n "$PASS" ]; then
+                AUTH="Authorization: Basic $(echo -n "$USER:$PASS" | base64 | tr -d '\n')"
+              else
+                echo "ERROR: Need token or username+password in credentials"
+                exit 1
+              fi
+              echo "=== AAP Crossplane provider vs running AAP API ==="
+              echo "AAP base: $HOST"
+              echo ""
+
+              # Require api/controller/v2 (gateway path); reject api/v2-only usage
+              CONTROLLER_V2_CODE=$(curl -s -k -o /tmp/controller_v2 -w "%{http_code}" -H "$AUTH" "$HOST/api/controller/v2/")
+              API_V2_CODE=$(curl -s -k -o /tmp/api_v2 -w "%{http_code}" -H "$AUTH" "$HOST/api/v2/")
+              if [ "$CONTROLLER_V2_CODE" != "200" ]; then
+                echo "FAIL: /api/controller/v2/ returned HTTP $CONTROLLER_V2_CODE (required for AAP 2.5+ gateway)."
+                echo "  Provider must use api/controller/v2, not api/v2. Set aap-credentials host to include /api/controller (e.g. http://aap-gateway.<ns>.svc.cluster.local/api/controller)."
+                exit 1
+              fi
+              if [ "$API_V2_CODE" = "200" ]; then
+                echo "OK: Both /api/v2/ and /api/controller/v2/ respond; provider must use /api/controller/v2/ (required)."
+              else
+                echo "OK: /api/controller/v2/ is available (required path)."
+              fi
+              echo ""
+
+              # GET api/controller/v2/ root (AAP 2.5+: use gateway, path is /api/controller/v2/)
+              ROOT=$(curl -s -k -H "$AUTH" "$HOST/api/controller/v2/" || echo "{}")
+              echo "--- AAP API (gateway) controller v2 root (resource keys) ---"
+              echo "$ROOT" | tr ',' '\n' | grep -oE '"[a-z_]+"' | tr -d '"' | sort -u || true
+              echo ""
+
+              # Provider resource -> AAP API endpoint mapping (Terraform ansible/aap provider)
+              echo "--- Provider resources vs AAP API endpoints ---"
+              check() {
+                path=$1
+                code=$(curl -s -k -o /tmp/out -w "%{http_code}" -H "$AUTH" "$HOST$path")
+                if [ "$code" = "200" ]; then
+                  count=$(grep -oE '"count":[[:space:]]*[0-9]*' /tmp/out | head -1)
+                  echo "  OK   $path -> $code $count"
+                else
+                  echo "  ---  $path -> HTTP $code"
+                fi
+              }
+              check "/api/controller/v2/inventories/"
+              check "/api/controller/v2/hosts/"
+              check "/api/controller/v2/groups/"
+              check "/api/controller/v2/jobs/"
+              check "/api/controller/v2/workflow_jobs/"
+              check "/api/controller/v2/job_templates/"
+              check "/api/controller/v2/workflow_job_templates/"
+              check "/api/controller/v2/organizations/"
+              echo ""
+
+              echo "--- Provider CRDs (aap-crossplane) ---"
+              echo "  inventory (aap.aap.crossplane.io)  -> AAP /api/controller/v2/inventories/"
+              echo "  host     (aap.aap.crossplane.io)  -> AAP /api/controller/v2/hosts/"
+              echo "  group    (aap.aap.crossplane.io)  -> AAP /api/controller/v2/groups/"
+              echo "  job      (job.aap.crossplane.io)  -> AAP /api/controller/v2/jobs/ (launch)"
+              echo "  workflowjob (job.aap.crossplane.io) -> AAP /api/controller/v2/workflow_jobs/ (launch)"
+              echo "  (no CRD) job_templates            -> AAP /api/controller/v2/job_templates/"
+              echo "  (no CRD) workflow_job_templates  -> AAP /api/controller/v2/workflow_job_templates/"
+              echo ""
+              echo "VALIDATION: Provider uses api/controller/v2 (not api/v2). Host in aap-credentials must include /api/controller for gateway."
+              echo "Validation complete."
+          volumeMounts:
+            - name: creds
+              readOnly: true
+              mountPath: /etc/aap-credentials
+          env:
+            - name: AAP_HOST
+              value: "http://aap-gateway.aap-operator.svc.cluster.local"
+      volumes:
+        - name: creds
+          secret:
+            secretName: aap-credentials
+            optional: false
+            items:
+              - key: credentials
+                path: credentials

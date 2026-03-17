@@ -51,3 +51,9 @@ func GetProvider() *ujconfig.Provider {
 	pc.ConfigureResources()
 	return pc
 }
+
+// GetProviderNamespaced returns the provider configuration for namespaced resources.
+// AAP resources are cluster-scoped; this returns nil so only cluster-scoped resources are generated.
+func GetProviderNamespaced() *ujconfig.Provider {
+	return nil
+}

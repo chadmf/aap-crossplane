@@ -1,0 +1,15 @@
+# Template: Crossplane Provider for AAP
+# Replace SPEC_IMAGE with your built provider image (see BUILD.md).
+# Example: myreg.io/crossplane/provider-aap:v0.1.0
+---
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: provider-aap
+spec:
+  package: SPEC_IMAGE
+  packageRuntime:
+    configuration:
+      # Set to false for OpenShift; adjust if your cluster requires it
+      securityContext: false
+  revisionActivationPolicy: Automatic

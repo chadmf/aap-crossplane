@@ -1,0 +1,35 @@
+# Example: create a Job Template in AAP (reference shape).
+#
+# The current AAP Crossplane provider does not include a JobTemplate CRD. The
+# Terraform ansible/aap provider exposes aap_job (launch job) and aap_workflow_job,
+# but the scaffold in this repo has not been extended with aap_job_template.
+#
+# To support creating job templates via Crossplane you would need to:
+#   1. Add aap_job_template to the Terraform provider config and regenerate the
+#      provider (see provider/config/provider-metadata.yaml and config/aap/).
+#   2. Then use a manifest like the one below (field names would match the
+#      generated CRD from the Terraform schema).
+#
+# This file is a reference for the expected shape. Do not apply as-is unless the
+# provider has been regenerated with JobTemplate support.
+#
+# Until then, create job templates in AAP via the UI (Resources → Templates →
+# Job Templates) or via the AAP API (POST /api/v2/job_templates/).
+---
+# apiVersion: aap.aap.crossplane.io/v1alpha1   # or job.aap.crossplane.io - TBD by generator
+# kind: JobTemplate
+# metadata:
+#   name: example-job-template
+# spec:
+#   forProvider:
+#     name: example-hello-world
+#     description: "Job template created via Crossplane"
+#     project: 1              # Project ID
+#     playbook: playbook.yml   # Playbook path in the project
+#     inventory: 1            # Inventory ID (optional if prompt on launch)
+#     jobType: run            # run | check
+#     verbosity: 0            # 0-4
+#     # organization: 1      # if required by AAP
+#   providerConfigRef:
+#     name: default
+#   deletionPolicy: Delete
