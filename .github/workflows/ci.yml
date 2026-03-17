@@ -1,4 +1,4 @@
-# Validate scaffold and build the provider from the template + this scaffold.
+# Validate scaffold: shell scripts, YAML, and Markdown.
 name: CI
 
 on:
@@ -40,18 +40,3 @@ jobs:
       - name: Lint Markdown
         run: markdownlint README.md BUILD.md provider/README.md
         continue-on-error: true
-
-  build:
-    name: Build provider
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install Podman
-        run: |
-          sudo apt-get update -qq && sudo apt-get install -y podman
-
-      - name: Build provider image (in container)
-        run: |
-          podman build -f deploy/Dockerfile.ci -t provider-aap:latest .

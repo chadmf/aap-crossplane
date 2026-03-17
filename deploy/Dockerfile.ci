@@ -33,8 +33,11 @@ RUN go install golang.org/x/tools/cmd/goimports@v0.24.0
 WORKDIR /workspace
 COPY . .
 
-# Clone template and prepare as AAP provider
-RUN git clone --depth 1 https://github.com/crossplane/upjet-provider-template.git provider-aap \
+# Full clone (not --depth 1): shallow trees + submodules break prepare.sh git grep/git clean in some environments (exit 128).
+# Trust repo dir so Git 2.35+ does not fail with "detected dubious ownership" during prepare.
+RUN git config --global --add safe.directory '*'
+
+RUN git clone https://github.com/crossplane/upjet-provider-template.git provider-aap \
     && cd provider-aap && make submodules
 
 RUN cd provider-aap && \
