@@ -2,7 +2,7 @@
 
 ## TL;DR
 
-This is a prototype for creating a crossplane provider for the Ansible Automation Platform(AAP). The architecture design for creating a Crossplane Provider for the AAP is structured around bridging Kubernetes' declarative model with Ansible's task-driven execution.
+This is a prototype for creating a crossplane provider for the Ansible Automation Platform(AAP). The architecture design for creating a Crossplane Provider for the AAP is structured around bridging Kubernetes' declarative model with Ansible's task-driven execution. The main goals of this is to test creating resources in AAP via kubernetes CRDs via crossplane and showing this is a viable solution going forward.
 
 ## Table of Contents
 
@@ -22,10 +22,10 @@ This is a prototype for creating a crossplane provider for the Ansible Automatio
   - [6.4 Deploy the AAP Crossplane provider](#64-deploy-the-aap-crossplane-provider)
   - [6.5 Order of operations (summary)](#65-order-of-operations-summary)
   - [6.6 References](#66-references)
-- **Documentation ([`docs/`](docs/))**
+- [7. Documentation](#7-documentation)
   - [Build vs deploy overview](docs/README.md)
-  - **Build** (provider image/package): [Build image (Podman)](docs/build/BUILD-PROVIDER-IMAGE.md), [Package image (xpkg)](docs/build/CROSSPLANE-PACKAGE-IMAGE.md), [Push to Quay](docs/build/PUSH-TO-QUAY-AND-OPENSHIFT.md)
-  - **Deploy**: [OpenShift (full guide)](docs/deploy/openshift-deploy.md), [Deploy via Quay](docs/deploy/DEPLOY-AAP-PROVIDER-OPENSHIFT.md), [CRC / OpenShift Local](docs/deploy/DEPLOY-ON-CRC.md), [Validate provider vs AAP API](docs/deploy/VALIDATE-AAP-PROVIDER-API.md)
+  - Build (provider image/package): [Build image (Podman)](docs/build/BUILD-PROVIDER-IMAGE.md), [Package image (xpkg)](docs/build/CROSSPLANE-PACKAGE-IMAGE.md), [Push to Quay](docs/build/PUSH-TO-QUAY-AND-OPENSHIFT.md)
+  - Deploy: [OpenShift (full guide)](docs/deploy/openshift-deploy.md), [Deploy via Quay](docs/deploy/DEPLOY-AAP-PROVIDER-OPENSHIFT.md), [CRC / OpenShift Local](docs/deploy/DEPLOY-ON-CRC.md), [Validate provider vs AAP API](docs/deploy/VALIDATE-AAP-PROVIDER-API.md)
 - [Workflows (CI)](workflows.md)
 
 ---
@@ -164,20 +164,7 @@ oc get pods -n crossplane-system
    - Create a `Provider` resource that points to your provider image, or use `kubectl crossplane install provider` / the Crossplane CLI with the provider package.
    - Ensure the provider’s ServiceAccount has RBAC that allows reading Secrets (in the namespace where the `ProviderConfig` secret lives) and managing the provider’s CRDs.
 
-2. **Create the AAP credentials Secret** in the same namespace as the provider (e.g. `crossplane-system`), with the AAP URL and an Application Token (recommended; or username/password). Example shape:
-
-   ```yaml
-   apiVersion: v1
-   kind: Secret
-   metadata:
-     name: aap-credentials
-     namespace: crossplane-system
-   type: Opaque
-   stringData:
-     credentials: '{"host":"https://aap.example.com","token":"YOUR_AAP_TOKEN"}'
-   ```
-
-   Use the AAP URL from the Automation controller route/ingress and an Application Token scoped to the right organization.
+2. **Create the AAP credentials Secret** in the same namespace as the provider (e.g. `crossplane-system`), with the AAP URL and an Application Token. See [deploy/aap-credentials-secret.yaml](deploy/aap-credentials-secret.yaml) for the format and `kubectl create secret` / `./deploy/create-aap-credentials-secret.sh` usage. Use the AAP URL from the Automation controller route/ingress (AAP 2.5+: gateway URL) and an Application Token scoped to the right organization.
 
 3. **Create a ProviderConfig** that references this Secret (see [provider/examples/providerconfig.yaml](provider/examples/providerconfig.yaml)). Set `spec.credentials.secretRef` to the Secret name and key above.
 
@@ -199,3 +186,11 @@ oc get pods -n crossplane-system
 - [Deploying AAP 2 on Red Hat OpenShift](https://docs.redhat.com/en/documentation/red_hat_ansible_automation_platform/2.4/html/deploying_ansible_automation_platform_2_on_red_hat_openshift/)
 - [Crossplane – OpenShift Operator](https://blog.crossplane.io/crossplane-openshift-operator-cloud-native-services/)
 - [BUILD.md](BUILD.md) (this repo)
+
+## 7. Documentation
+
+Detailed guides are in [`docs/`](docs/), split into **build** (provider image/package) and **deploy** (Crossplane, credentials, provider install):
+
+- [Build vs deploy overview](docs/README.md)
+- **Build** (provider image/package): [Build image (Podman)](docs/build/BUILD-PROVIDER-IMAGE.md), [Package image (xpkg)](docs/build/CROSSPLANE-PACKAGE-IMAGE.md), [Push to Quay](docs/build/PUSH-TO-QUAY-AND-OPENSHIFT.md)
+- **Deploy**: [OpenShift (full guide)](docs/deploy/openshift-deploy.md), [Deploy via Quay](docs/deploy/DEPLOY-AAP-PROVIDER-OPENSHIFT.md), [CRC / OpenShift Local](docs/deploy/DEPLOY-ON-CRC.md), [Validate provider vs AAP API](docs/deploy/VALIDATE-AAP-PROVIDER-API.md)
