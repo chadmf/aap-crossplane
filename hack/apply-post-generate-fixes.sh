@@ -37,6 +37,9 @@ if [[ -f "${ZZ_REGISTER}" ]]; then
   rm -f "${ZZ_REGISTER}.bak"
 fi
 
+# Remove template leftover zz_register.go that reference removed null packages (controller-gen would fail).
+rm -f "${PROVIDER_REPO}/apis/cluster/zz_register.go" "${PROVIDER_REPO}/apis/namespaced/zz_register.go"
+
 cp -r "${SCAFFOLD_REPO}/hack/post-generate-fixes/apis/cluster" "${PROVIDER_REPO}/apis/"
 cp -r "${SCAFFOLD_REPO}/hack/post-generate-fixes/apis/namespaced" "${PROVIDER_REPO}/apis/"
 cp -r "${SCAFFOLD_REPO}/hack/post-generate-fixes/internal/controller/cluster" "${PROVIDER_REPO}/internal/controller/"

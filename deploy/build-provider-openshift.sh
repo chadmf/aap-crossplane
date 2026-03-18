@@ -35,10 +35,9 @@ fi
 out=$(oc get buildconfigs -A 2>&1) || true
 if echo "$out" | grep -q "doesn't have a resource type"; then
   echo "ERROR: This cluster does not have OpenShift build APIs (BuildConfig)."
-  echo "  OpenShift Local (CRC) often does not include the legacy build subsystem."
-  echo "  See deploy/CRC-BUILD-APIS.md for details and options."
-  echo "  Recommended on CRC: ./deploy/build-provider-image-podman.sh provider-aap:latest"
-  echo "  Then: podman save provider-aap:latest | crc image load -"
+  echo "  OpenShift Local often does not include the legacy build subsystem."
+  echo "  Recommended: ./deploy/build-provider-image-podman.sh aap-crossplane:latest"
+  echo "  Then push to Quay (or another registry) and set spec.package in deploy/provider.yaml"
   exit 1
 fi
 
@@ -77,8 +76,8 @@ echo "  Starting OpenShift build (binary upload + Docker build)..."
 oc start-build provider-aap --from-dir="$BUILD_DIR" -n "$BUILD_NAMESPACE" --follow
 
 echo "Done. Image is in the internal registry:"
-echo "  image-registry.openshift-image-registry.svc:5000/${BUILD_NAMESPACE}/provider-aap:latest"
+echo "  image-registry.openshift-image-registry.svc:5000/${BUILD_NAMESPACE}/aap-crossplane:latest"
 echo ""
 echo "Use it in deploy/provider.yaml:"
-echo "  spec.package: image-registry.openshift-image-registry.svc:5000/${BUILD_NAMESPACE}/provider-aap:latest"
+echo "  spec.package: image-registry.openshift-image-registry.svc:5000/${BUILD_NAMESPACE}/aap-crossplane:latest"
 echo "Then: kubectl apply -f deploy/provider.yaml"

@@ -44,7 +44,7 @@ kubectl get crd | grep crossplane.io
 
 The AAP provider is built from this repo’s scaffold (see [BUILD.md](../BUILD.md)). There is no pre-built image published.
 
-1. **Apply provider CRDs** (from your built provider-aap repo):
+1. **Apply provider CRDs** (from your built provider repo, e.g. provider-aap):
 
    ```bash
    kubectl apply -f /path/to/provider-aap/package/crds/
@@ -77,46 +77,39 @@ The AAP provider is built from this repo’s scaffold (see [BUILD.md](../BUILD.m
    Expect: `SUCCESS: AAP API is reachable from the cluster.`
 
 5. **Run the provider** (choose one):
-   - **Locally**: From the provider-aap repo, run `make run` (connects to the cluster and reconciles using the in-cluster AAP API).
+   - **Locally**: From the generated provider repo (provider-aap), run `make run` (connects to the cluster and reconciles using the in-cluster AAP API).
    - **In-cluster on OpenShift**: Build the image **on the cluster** so it lands in the internal registry: see [Build provider image on OpenShift](#build-provider-image-on-openshift) below.
-   - **In-cluster (Podman/CRC)**: Build with [Podman](#build-provider-image-with-podman) then load (e.g. `crc image load`) or push to a registry; set the image in [provider.yaml](provider.yaml) and `kubectl apply -f deploy/provider.yaml`.
+   - **In-cluster (Podman)**: Build with [Podman](#build-provider-image-with-podman) then push to a registry (internal or external); set the image in [provider.yaml](provider.yaml) and `kubectl apply -f deploy/provider.yaml`.
 
 6. **Apply managed resources**: e.g. `kubectl apply -f deploy/example-inventory.yaml` (create an inventory), or `kubectl apply -f deploy/example-job.yaml` (launch a job from an existing job template). Verify in the AAP UI. Note: the provider does not yet include a CRD to *create* job templates; see [example-job-template.yaml](example-job-template.yaml) for a reference shape if you extend the provider.
 
 ## Build provider image with Podman
 
-If you don’t have Docker but have **Podman**, use the script in this repo to build the AAP Crossplane provider image. It builds the Go binary for `linux/amd64` or `linux/arm64` (from your host arch) and runs `podman build` with the same Dockerfile and Terraform/AAP provider settings used by provider-aap.
+If you don’t have Docker but have **Podman**, use the script in this repo (aap-crossplane) to build the AAP Crossplane provider image. It builds the Go binary for `linux/amd64` or `linux/arm64` (from your host arch) and runs `podman build` with the same Dockerfile and Terraform/AAP provider settings used by the generated provider (provider-aap).
 
 **Prerequisites:** Podman, Go, and the [provider-aap](https://github.com/crossplane-contrib/provider-aap) repo (default: sibling of aap-crossplane, i.e. `../provider-aap`).
 
 ```bash
 # From aap-crossplane repo root (default: provider-aap at ../provider-aap)
-./deploy/build-provider-image-podman.sh provider-aap:latest
+./deploy/build-provider-image-podman.sh aap-crossplane:latest
 
 # Optional: custom provider-aap path
-PROVIDER_AAP_DIR=/path/to/provider-aap ./deploy/build-provider-image-podman.sh provider-aap:v0.1.0
+PROVIDER_AAP_DIR=/path/to/provider-aap ./deploy/build-provider-image-podman.sh aap-crossplane:v0.1.0
 ```
 
-**Load into CRC** (CodeReady Containers):
+**Use the image on OpenShift:** Push to a registry your cluster can pull from (internal OpenShift registry or external such as Quay), then set [provider.yaml](provider.yaml) `spec.package` to that image (e.g. `image-registry.openshift-image-registry.svc:5000/crossplane-system/aap-crossplane:latest` or `quay.io/myorg/aap-crossplane:latest`) and apply:
 
 ```bash
-podman save provider-aap:latest | crc image load -
-```
-
-Then set [provider.yaml](provider.yaml) `spec.package` to `provider-aap:latest` and apply:
-
-```bash
-# Edit provider.yaml: spec.package: provider-aap:latest
 kubectl apply -f deploy/provider.yaml
 ```
 
-For other clusters, push the image to a registry your cluster can pull from and set `spec.package` to that image (e.g. `myreg.io/crossplane/provider-aap:v0.1.0`).
+See [BUILD-PROVIDER-IMAGE.md](BUILD-PROVIDER-IMAGE.md) for push options (internal registry vs external).
 
 ## Build provider image on OpenShift
 
-Build the provider image **on your local OpenShift cluster** so the image is stored in the internal image registry (no external push or `crc image load` needed).
+Build the provider image **on your OpenShift cluster** so the image is stored in the internal image registry (no external push needed).
 
-**OpenShift Local (CRC):** Many OpenShift Local installs do not include the legacy build subsystem (BuildConfig/ImageStream). If `./deploy/build-provider-openshift.sh` reports that the cluster doesn't have BuildConfig, use [Build provider image with Podman](#build-provider-image-with-podman) and then load the image: `podman save provider-aap:latest | crc image load -`. See [CRC-BUILD-APIS.md](CRC-BUILD-APIS.md) for why and what to try on CRC.
+**OpenShift Local:** Many OpenShift Local installs do not include the legacy build subsystem (BuildConfig/ImageStream). If `./deploy/build-provider-openshift.sh` reports that the cluster doesn't have BuildConfig, use [Build provider image with Podman](#build-provider-image-with-podman) and push the image to an external registry (e.g. Quay), then set `spec.package` in [provider.yaml](provider.yaml) to that image.
 
 **Prerequisites:** `oc` logged in to a cluster that has BuildConfig (e.g. full OpenShift), [provider-aap](https://github.com/crossplane-contrib/provider-aap) repo (default: `../provider-aap`), and the `crossplane-system` namespace (e.g. from step 1).
 
@@ -142,18 +135,18 @@ Build the provider image **on your local OpenShift cluster** so the image is sto
 
    ```bash
    # Edit deploy/provider.yaml: set spec.package to:
-   # image-registry.openshift-image-registry.svc:5000/crossplane-system/provider-aap:latest
+   # image-registry.openshift-image-registry.svc:5000/crossplane-system/aap-crossplane:latest
    kubectl apply -f deploy/provider.yaml
    ```
 
-The image is available at `image-registry.openshift-image-registry.svc:5000/crossplane-system/provider-aap:latest` for in-cluster pulls. The build uses `linux/amd64`; for arm64 nodes set `GOARCH=arm64` when running the script.
+The image is available at `image-registry.openshift-image-registry.svc:5000/crossplane-system/aap-crossplane:latest` for in-cluster pulls. The build uses `linux/amd64`; for arm64 nodes set `GOARCH=arm64` when running the script.
 
 **Troubleshooting — `InvalidOutputReference: Output image could not be resolved`:** The cluster’s **internal image registry** is not available (check `oc get svc -n openshift-image-registry`). Two options:
 
 1. **Use an external registry for the build output** (recommended when internal registry is missing):
    - Create a push secret in `crossplane-system` for your registry (e.g. Quay, GHCR):  
      `oc create secret docker-registry provider-aap-push-secret -n crossplane-system --docker-server=<registry> --docker-username=<user> --docker-password=<token>`
-   - Edit [provider-aap-buildconfig-external-registry.yaml](provider-aap-buildconfig-external-registry.yaml): set `output.to.name` to your image (e.g. `quay.io/myorg/provider-aap:latest`).
+   - Edit [provider-aap-buildconfig-external-registry.yaml](provider-aap-buildconfig-external-registry.yaml): set `output.to.name` to your image (e.g. `quay.io/myorg/aap-crossplane:latest`).
    - Apply it (replacing the default BuildConfig):  
      `kubectl apply -f deploy/provider-aap-buildconfig-external-registry.yaml`
    - Run `./deploy/build-provider-openshift.sh`; the image will be pushed to your registry. Set `spec.package` in [provider.yaml](provider.yaml) to that image.

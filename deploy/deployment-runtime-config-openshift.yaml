@@ -1,0 +1,31 @@
+# DeploymentRuntimeConfig for OpenShift: provider pods default to runAsUser 2000,
+# which OpenShift restricted SCC rejects. Set UIDs inside crossplane-system’s range.
+#
+# MUST match the first number from:
+#   oc get namespace crossplane-system -o jsonpath='{.metadata.annotations.openshift\.io/sa\.scc\.uid-range}{"\n"}'
+# (e.g. 1000160000/10000 → use 1000160000; edit this file if your range differs.)
+---
+apiVersion: pkg.crossplane.io/v1beta1
+kind: DeploymentRuntimeConfig
+metadata:
+  name: default
+  namespace: crossplane-system
+spec:
+  deploymentTemplate:
+    spec:
+      selector: {}
+      template:
+        spec:
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000160000
+            runAsGroup: 1000160000
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: package-runtime
+              securityContext:
+                allowPrivilegeEscalation: false
+                runAsNonRoot: true
+                runAsUser: 1000160000
+                runAsGroup: 1000160000
