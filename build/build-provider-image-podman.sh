@@ -3,11 +3,10 @@
 # Run from aap-crossplane repo root; set PROVIDER_AAP_DIR if provider-aap is elsewhere.
 #
 # Usage:
-#   ./deploy/build-provider-image-podman.sh [image-tag]
-#   PROVIDER_AAP_DIR=/path/to/provider-aap ./deploy/build-provider-image-podman.sh aap-crossplane:v0.1.0
+#   ./build/build-provider-image-podman.sh [image-tag]
+#   PROVIDER_AAP_DIR=/path/to/provider-aap ./build/build-provider-image-podman.sh aap-crossplane:v0.1.0
 #
 # Then push to a registry (e.g. Quay or OpenShift internal registry) and set spec.package in deploy/provider.yaml
-# Or push to a registry and set deploy/provider.yaml spec.package to that image.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -87,4 +86,4 @@ podman build \
 
 echo "Done. Image: $IMAGE_TAG"
 echo "  Push to a registry and set spec.package in deploy/provider.yaml"
-echo "  Then set deploy/provider.yaml spec.package to this image and: kubectl apply -f deploy/provider.yaml"
+echo "  Then: kubectl apply -f deploy/provider.yaml"

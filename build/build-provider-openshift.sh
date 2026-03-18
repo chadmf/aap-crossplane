@@ -5,12 +5,12 @@
 #
 # Prerequisites:
 #   - oc logged in to your OpenShift cluster
-#   - BuildConfig applied: kubectl apply -f deploy/provider-aap-buildconfig.yaml
+#   - BuildConfig applied: kubectl apply -f build/provider-aap-buildconfig.yaml
 #   - provider-aap repo (default: ../provider-aap; set PROVIDER_AAP_DIR)
 #
 # Usage:
-#   ./deploy/build-provider-openshift.sh
-#   BUILD_NAMESPACE=crossplane-system PROVIDER_AAP_DIR=/path/to/provider-aap ./deploy/build-provider-openshift.sh
+#   ./build/build-provider-openshift.sh
+#   BUILD_NAMESPACE=crossplane-system PROVIDER_AAP_DIR=/path/to/provider-aap ./build/build-provider-openshift.sh
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -36,7 +36,7 @@ out=$(oc get buildconfigs -A 2>&1) || true
 if echo "$out" | grep -q "doesn't have a resource type"; then
   echo "ERROR: This cluster does not have OpenShift build APIs (BuildConfig)."
   echo "  OpenShift Local often does not include the legacy build subsystem."
-  echo "  Recommended: ./deploy/build-provider-image-podman.sh aap-crossplane:latest"
+  echo "  Recommended: ./build/build-provider-image-podman.sh aap-crossplane:latest"
   echo "  Then push to Quay (or another registry) and set spec.package in deploy/provider.yaml"
   exit 1
 fi

@@ -1,11 +1,11 @@
 # Validate AAP Crossplane provider vs running AAP API
 
-This describes how to check that the AAP Crossplane provider’s managed resources align with the APIs exposed by your running AAP (Ansible Automation Platform) instance.
+This describes how to check that the AAP Crossplane provider's managed resources align with the APIs exposed by your running AAP (Ansible Automation Platform) instance.
 
 ## Quick run
 
 ```bash
-kubectl apply -f deploy/validate-aap-provider-api-alignment.yaml
+kubectl apply -f deploy/testing-scripts/validate-aap-provider-api-alignment.yaml
 kubectl wait --for=condition=complete job/validate-aap-provider-api -n crossplane-system --timeout=90s
 kubectl logs job/validate-aap-provider-api -n crossplane-system
 ```
@@ -48,4 +48,4 @@ If an endpoint returns **200** and a `count`, the running AAP instance supports 
 - **---** with HTTP 404 – Endpoint not found; possible version or path difference (e.g. controller vs gateway path).
 - **---** with HTTP 401/403 – Auth or permissions; token may need different scopes or the user may need more access.
 
-AAP 2.5+ uses the gateway; the controller API is at `/api/controller/v2/`. This validation **requires** that path: if `/api/controller/v2/` is not reachable, the job fails. The provider (and aap-credentials `host`) must be configured to use the gateway with `/api/controller` in the base URL so that API calls use `/api/controller/v2/`, not `/api/v2/` only. Older installs may expose `/api/v2/` on the controller; for the gateway, use `/api/controller/v2/`. The job uses gateway service `aap-gateway` by default; adjust the job’s `HOST` or paths if your instance differs.
+AAP 2.5+ uses the gateway; the controller API is at `/api/controller/v2/`. This validation **requires** that path: if `/api/controller/v2/` is not reachable, the job fails. The provider (and aap-credentials `host`) must be configured to use the gateway with `/api/controller` in the base URL so that API calls use `/api/controller/v2/`, not `/api/v2/` only. Older installs may expose `/api/v2/` on the controller; for the gateway, use `/api/controller/v2/`. The job uses gateway service `aap-gateway` by default; adjust the job's `HOST` or paths if your instance differs.

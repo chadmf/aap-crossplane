@@ -1,6 +1,6 @@
 # Build the AAP Crossplane provider image on OpenShift (internal registry).
-# 1. Apply this file: kubectl apply -f deploy/provider-aap-buildconfig.yaml
-# 2. Run: ./deploy/build-provider-openshift.sh
+# 1. Apply this file: kubectl apply -f build/provider-aap-buildconfig.yaml
+# 2. Run: ./build/build-provider-openshift.sh
 # The image will be available as image-registry.openshift-image-registry.svc:5000/<namespace>/provider-aap:latest
 ---
 apiVersion: image.openshift.io/v1

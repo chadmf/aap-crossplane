@@ -31,7 +31,7 @@ metadata:
 spec:
   forProvider:
     name: ansible
-    inventoryId: 2   # Replace with the Inventory's ID from: kubectl get inventory example-inventory -o jsonpath='{.metadata.annotations.crossplane\.io/external-name}'
+    inventoryId: 3   # Replace with the Inventory's ID from: kubectl get inventory example-inventory -o jsonpath='{.metadata.annotations.crossplane\.io/external-name}'
     variables: '{"ansible_host": "192.0.2.10"}'   # documentation-only IP; use your host
     enabled: true
   providerConfigRef:

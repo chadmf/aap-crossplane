@@ -8,8 +8,8 @@ This guide is for **CodeReady Containers (CRC)** / **OpenShift Local**: a single
 |-------|--------|
 | **BuildConfig** | Often **not** available. Use [Podman + Quay](DEPLOY-AAP-PROVIDER-OPENSHIFT.md) (or another registry) for provider images; do not rely on `build-provider-openshift.sh` unless your CRC has build APIs. |
 | **Internal registry** | May be available; many users still push to **Quay** so the cluster can pull without extra registry setup. |
-| **Node arch** | CRC VM is usually **linux/amd64**. Build the controller image for **amd64** (`GOARCH=amd64` on Apple Silicon). Build the **xpkg** on **amd64** too (see [CROSSPLANE-PACKAGE-IMAGE.md](../deploy/CROSSPLANE-PACKAGE-IMAGE.md) § Apple Silicon). |
-| **Namespace UID range** | **Different per cluster.** You must align Helm values and `DeploymentRuntimeConfig` with `crossplane-system`’s range (steps below). |
+| **Node arch** | CRC VM is usually **linux/amd64**. Build the controller image for **amd64** (`GOARCH=amd64` on Apple Silicon). Build the **xpkg** on **amd64** too (see [CROSSPLANE-PACKAGE-IMAGE.md](../build/CROSSPLANE-PACKAGE-IMAGE.md) § Apple Silicon). |
+| **Namespace UID range** | **Different per cluster.** You must align Helm values and `DeploymentRuntimeConfig` with `crossplane-system`'s range (steps below). |
 
 ## Prerequisites
 
@@ -32,7 +32,7 @@ Note the **first number** (e.g. `1000680000`). You will use it as `runAsUser` an
 
 ## 2. Edit Crossplane Helm values
 
-Copy [deploy/crossplane-values-openshift.yaml](../deploy/crossplane-values-openshift.yaml) and set **every** `runAsUser` / `runAsGroup` (Crossplane and RBAC manager) to your namespace’s first UID from step 1.
+Copy [deploy/crossplane-values-openshift.yaml](../../deploy/crossplane-values-openshift.yaml) and set **every** `runAsUser` / `runAsGroup` (Crossplane and RBAC manager) to your namespace's first UID from step 1.
 
 ## 3. Install Crossplane
 
@@ -53,7 +53,7 @@ oc get pods -n crossplane-system
 
 ## 4. DeploymentRuntimeConfig (provider pods)
 
-Provider pods also need UIDs in the same range. Edit [deploy/deployment-runtime-config-openshift.yaml](../deploy/deployment-runtime-config-openshift.yaml): set `runAsUser` / `runAsGroup` to the **same** value as in step 1, then:
+Provider pods also need UIDs in the same range. Edit [deploy/deployment-runtime-config-openshift.yaml](../../deploy/deployment-runtime-config-openshift.yaml): set `runAsUser` / `runAsGroup` to the **same** value as in step 1, then:
 
 ```bash
 oc apply -f deploy/deployment-runtime-config-openshift.yaml
@@ -63,10 +63,10 @@ oc apply -f deploy/deployment-runtime-config-openshift.yaml
 
 Crossplane installs a **package** image (xpkg), not the raw controller image. Full flow:
 
-1. **Controller** (amd64): `GOARCH=amd64 ./deploy/build-provider-image-podman.sh aap-crossplane:v0.1.0` → push to `quay.io/<you>/aap-crossplane:v0.1.0`
+1. **Controller** (amd64): `GOARCH=amd64 ./build/build-provider-image-podman.sh aap-crossplane:v0.1.0` → push to `quay.io/<you>/aap-crossplane:v0.1.0`
 2. **Package**: from **provider-aap**, `crossplane xpkg build` + `crossplane xpkg push` → `quay.io/<you>/aap-crossplane:latest`
 
-See [CROSSPLANE-PACKAGE-IMAGE.md](../deploy/CROSSPLANE-PACKAGE-IMAGE.md) and [DEPLOY-AAP-PROVIDER-OPENSHIFT.md](DEPLOY-AAP-PROVIDER-OPENSHIFT.md). Use **Docker login** (or `~/.docker/config.json`) for `crossplane xpkg push` if you see Quay `UNAUTHORIZED`.
+See [CROSSPLANE-PACKAGE-IMAGE.md](../build/CROSSPLANE-PACKAGE-IMAGE.md) and [DEPLOY-AAP-PROVIDER-OPENSHIFT.md](DEPLOY-AAP-PROVIDER-OPENSHIFT.md). Use **Docker login** (or `~/.docker/config.json`) for `crossplane xpkg push` if you see Quay `UNAUTHORIZED`.
 
 ## 6. Install the provider on CRC
 
@@ -75,9 +75,9 @@ PROVIDER_AAP_DIR="${PROVIDER_AAP_DIR:-$(pwd)/../provider-aap}"
 oc apply -f "${PROVIDER_AAP_DIR}/package/crds/"
 ```
 
-Create **aap-credentials** and **ProviderConfig** (see [openshift-deploy.md](openshift-deploy.md) and [deploy/aap-credentials-secret.yaml](../deploy/aap-credentials-secret.yaml)).
+Create **aap-credentials** and **ProviderConfig** (see [openshift-deploy.md](openshift-deploy.md) and [deploy/aap-credentials-secret.yaml](../../deploy/aap-credentials-secret.yaml)).
 
-Edit [deploy/provider.yaml](../deploy/provider.yaml): set `spec.package` to your package image (e.g. `quay.io/<you>/aap-crossplane:latest`). Add `packagePullSecrets` only if the image is private.
+Edit [deploy/provider.yaml](../../deploy/provider.yaml): set `spec.package` to your package image (e.g. `quay.io/<you>/aap-crossplane:latest`). Add `packagePullSecrets` only if the image is private.
 
 ```bash
 oc apply -f deploy/provider.yaml
@@ -106,14 +106,14 @@ If status says the deployment has **no minimum availability**, check events:
 oc get events -n crossplane-system --field-selector involvedObject.kind=ReplicaSet --sort-by='.lastTimestamp' | tail -15
 ```
 
-**SCC / UID range:** If you see `runAsUser: Invalid value: 2000: must be in the ranges: [1000…]`, Crossplane’s `DeploymentRuntimeConfig` named **`default`** is empty or wrong. Apply [deploy/deployment-runtime-config-openshift.yaml](../deploy/deployment-runtime-config-openshift.yaml) with `runAsUser`/`runAsGroup` set to the **first number** from your namespace UID range (step 1), then wait for the provider deployment to roll out (or delete the provider deployment so it is recreated).
+**SCC / UID range:** If you see `runAsUser: Invalid value: 2000: must be in the ranges: [1000…]`, Crossplane's `DeploymentRuntimeConfig` named **`default`** is empty or wrong. Apply [deploy/deployment-runtime-config-openshift.yaml](../../deploy/deployment-runtime-config-openshift.yaml) with `runAsUser`/`runAsGroup` set to the **first number** from your namespace UID range (step 1), then wait for the provider deployment to roll out (or delete the provider deployment so it is recreated).
 
 ## 7. AAP not on CRC
 
-If AAP runs **outside** CRC (e.g. on another OpenShift or on your LAN), set `AAP_HOST` in the credentials secret to a URL reachable **from inside CRC pods** (not `localhost`). Examples: a Route hostname, or your host’s IP and a forwarded port.
+If AAP runs **outside** CRC (e.g. on another OpenShift or on your LAN), set `AAP_HOST` in the credentials secret to a URL reachable **from inside CRC pods** (not `localhost`). Examples: a Route hostname, or your host's IP and a forwarded port.
 
 ## See also
 
 - [openshift-deploy.md](openshift-deploy.md) — full OpenShift flow (CRDs, validation job, managed resources)
-- [docs/BUILD-PROVIDER-IMAGE.md](BUILD-PROVIDER-IMAGE.md) — build controller image with Podman
-- [README.md](../README.md) — repo overview and build pipeline
+- [BUILD-PROVIDER-IMAGE.md](../build/BUILD-PROVIDER-IMAGE.md) — build controller image with Podman
+- [README.md](../../README.md) — repo overview and build pipeline

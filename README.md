@@ -23,12 +23,9 @@ This is a prototype for creating a crossplane provider for the Ansible Automatio
   - [6.5 Order of operations (summary)](#65-order-of-operations-summary)
   - [6.6 References](#66-references)
 - **Documentation ([`docs/`](docs/))**
-  - [Build provider image (Podman)](docs/BUILD-PROVIDER-IMAGE.md)
-  - [Deploy AAP provider via Quay](docs/DEPLOY-AAP-PROVIDER-OPENSHIFT.md)
-  - [Deploy on CRC / OpenShift Local](docs/DEPLOY-ON-CRC.md)
-  - [Deploy on OpenShift (full guide)](docs/openshift-deploy.md)
-  - [Push to Quay and OpenShift](docs/PUSH-TO-QUAY-AND-OPENSHIFT.md)
-  - [Validate provider vs AAP API](docs/VALIDATE-AAP-PROVIDER-API.md)
+  - [Build vs deploy overview](docs/README.md)
+  - **Build** (provider image/package): [Build image (Podman)](docs/build/BUILD-PROVIDER-IMAGE.md), [Package image (xpkg)](docs/build/CROSSPLANE-PACKAGE-IMAGE.md), [Push to Quay](docs/build/PUSH-TO-QUAY-AND-OPENSHIFT.md)
+  - **Deploy**: [OpenShift (full guide)](docs/deploy/openshift-deploy.md), [Deploy via Quay](docs/deploy/DEPLOY-AAP-PROVIDER-OPENSHIFT.md), [CRC / OpenShift Local](docs/deploy/DEPLOY-ON-CRC.md), [Validate provider vs AAP API](docs/deploy/VALIDATE-AAP-PROVIDER-API.md)
 - [Workflows (CI)](workflows.md)
 
 ---
@@ -151,9 +148,9 @@ helm install crossplane crossplane-stable/crossplane \
 
 Alternatively, use the **Crossplane OpenShift Operator** (OLM) if available in your catalog. See [Crossplane on OpenShift](https://blog.crossplane.io/crossplane-openshift-operator-cloud-native-services/) and [Installing Crossplane on OpenShift](https://github.com/jeremycaine/crossplane-with-openshift) for variations and security context notes.
 
-**OpenShift:** Use the Helm values file [deploy/crossplane-values-openshift.yaml](deploy/crossplane-values-openshift.yaml) so Crossplane pods run with UIDs in the cluster’s restricted range; no SCC grants (e.g. `anyuid`) are required. See [docs/openshift-deploy.md](docs/openshift-deploy.md) for the full OpenShift deploy guide.
+**OpenShift:** Use the Helm values file [deploy/crossplane-values-openshift.yaml](deploy/crossplane-values-openshift.yaml) so Crossplane pods run with UIDs in the cluster’s restricted range; no SCC grants (e.g. `anyuid`) are required. See [docs/deploy/openshift-deploy.md](docs/deploy/openshift-deploy.md) for the full OpenShift deploy guide.
 
-**CRC / OpenShift Local:** See [docs/DEPLOY-ON-CRC.md](docs/DEPLOY-ON-CRC.md) for namespace UID range, Quay-based provider images, and differences from full OpenShift.
+**CRC / OpenShift Local:** See [docs/deploy/DEPLOY-ON-CRC.md](docs/deploy/DEPLOY-ON-CRC.md) for namespace UID range, Quay-based provider images, and differences from full OpenShift.
 
 Verify:
 
