@@ -1,8 +1,8 @@
 # Build the AAP Crossplane provider entirely inside the container.
 # Build context: aap-crossplane repo root (provider/, hack/, deploy/).
 #
-# Usage: podman build -f deploy/Dockerfile.ci -t provider-aap:latest .
-# Or:    docker build -f deploy/Dockerfile.ci -t provider-aap:latest .
+# Usage: podman build -f deploy/Dockerfile.ci -t aap-crossplane:latest .
+# Or:    docker build -f deploy/Dockerfile.ci -t aap-crossplane:latest .
 
 # -----------------------------------------------------------------------------
 # Stage 1: Clone template, apply scaffold, generate, build provider binary

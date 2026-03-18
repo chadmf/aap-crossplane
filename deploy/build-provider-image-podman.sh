@@ -4,17 +4,16 @@
 #
 # Usage:
 #   ./deploy/build-provider-image-podman.sh [image-tag]
-#   PROVIDER_AAP_DIR=/path/to/provider-aap ./deploy/build-provider-image-podman.sh provider-aap:v0.1.0
+#   PROVIDER_AAP_DIR=/path/to/provider-aap ./deploy/build-provider-image-podman.sh aap-crossplane:v0.1.0
 #
-# Then load into CRC (if using CodeReady Containers):
-#   podman save provider-aap:latest | crc image load -
+# Then push to a registry (e.g. Quay or OpenShift internal registry) and set spec.package in deploy/provider.yaml
 # Or push to a registry and set deploy/provider.yaml spec.package to that image.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 AAP_CROSSPLANE_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 PROVIDER_AAP_DIR="${PROVIDER_AAP_DIR:-$(dirname "$AAP_CROSSPLANE_ROOT")/provider-aap}"
-IMAGE_TAG="${1:-provider-aap:latest}"
+IMAGE_TAG="${1:-aap-crossplane:latest}"
 
 if [[ ! -d "$PROVIDER_AAP_DIR" ]]; then
   echo "ERROR: provider-aap dir not found at $PROVIDER_AAP_DIR"
@@ -22,13 +21,16 @@ if [[ ! -d "$PROVIDER_AAP_DIR" ]]; then
   exit 1
 fi
 
-# Detect arch for Go and Docker (linux_arm64 or linux_amd64)
+# Detect arch for Go and Docker (linux_arm64 or linux_amd64).
+# Override with GOARCH=amd64 when building on arm64 (e.g. M1) for an amd64 cluster.
 ARCH=$(uname -m)
-case "$ARCH" in
-  x86_64|amd64)  GOARCH=amd64; ;;
-  arm64|aarch64) GOARCH=arm64;  ;;
-  *) echo "ERROR: unsupported arch $ARCH"; exit 1; ;;
-esac
+if [[ -z "${GOARCH:-}" ]]; then
+  case "$ARCH" in
+    x86_64|amd64)  GOARCH=amd64; ;;
+    arm64|aarch64) GOARCH=arm64;  ;;
+    *) echo "ERROR: unsupported arch $ARCH"; exit 1; ;;
+  esac
+fi
 PLATFORM="linux_${GOARCH}"
 
 # AAP Terraform provider vars (must match provider-aap Makefile.aap)
@@ -84,5 +86,5 @@ podman build \
   "$BUILD_DIR"
 
 echo "Done. Image: $IMAGE_TAG"
-echo "  Load into CRC: podman save $IMAGE_TAG | crc image load -"
+echo "  Push to a registry and set spec.package in deploy/provider.yaml"
 echo "  Then set deploy/provider.yaml spec.package to this image and: kubectl apply -f deploy/provider.yaml"

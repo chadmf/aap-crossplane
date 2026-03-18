@@ -12,7 +12,7 @@ PROJECT_REPO ?= github.com/crossplane-contrib/$(PROJECT_NAME)
 # Releases: https://github.com/ansible/terraform-provider-aap/releases
 export TERRAFORM_PROVIDER_SOURCE ?= ansible/aap
 export TERRAFORM_PROVIDER_REPO ?= https://github.com/ansible/terraform-provider-aap
-export TERRAFORM_PROVIDER_VERSION ?= 0.4.0
+export TERRAFORM_PROVIDER_VERSION ?= 1.4.0
 export TERRAFORM_PROVIDER_DOWNLOAD_NAME ?= terraform-provider-aap
 # Community provider: download from GitHub releases (adjust version to match above)
 export TERRAFORM_PROVIDER_DOWNLOAD_URL_PREFIX ?= https://github.com/ansible/terraform-provider-aap/releases/download/v$(TERRAFORM_PROVIDER_VERSION)

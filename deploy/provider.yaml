@@ -1,15 +1,16 @@
-# Template: Crossplane Provider for AAP
-# Replace SPEC_IMAGE with your built provider image (see BUILD.md).
-# Example: myreg.io/crossplane/provider-aap:v0.1.0
+# Template: Crossplane Provider for AAP (aap-crossplane)
+# Crossplane requires a fully qualified image (registry/repo:tag).
+# - OpenShift internal registry: image-registry.openshift-image-registry.svc:5000/<namespace>/aap-crossplane:latest
+#   Push first: podman tag aap-crossplane:latest <registry-route>/crossplane-system/aap-crossplane:latest && podman push ...
+# - No internal registry: push to quay.io or docker.io and set spec.package to that image.
 ---
 apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
-  name: provider-aap
+  name: aap-crossplane-provider
 spec:
-  package: SPEC_IMAGE
-  packageRuntime:
-    configuration:
-      # Set to false for OpenShift; adjust if your cluster requires it
-      securityContext: false
+  # Replace myorg with your Quay org or username; push the xpkg first (see docs/CROSSPLANE-PACKAGE-IMAGE.md).
+  package: quay.io/myorg/aap-crossplane:latest
+  # Public Quay repos: omit packagePullSecrets. Private only: packagePullSecrets: [{ name: quay-pull-secret }]
   revisionActivationPolicy: Automatic
+  # packageRuntime (e.g. securityContext: false for OpenShift) is supported on newer Crossplane; remove the comment and add if your version supports it

@@ -1,13 +1,13 @@
-# Create an inventory on AAP and add a host "ansible" with IP 192.168.68.67.
+# Create an inventory on AAP and add a host "ansible" (replace ansible_host with your target IP/DNS).
 #
 # Apply in two steps (the Host needs the inventory ID, which is only known after the Inventory is created):
 #   1. Apply the Inventory and wait until Ready:
-#        kubectl apply -f deploy/example-inventory-with-host.yaml
+#        kubectl apply -f examples/example-inventory-with-host.yaml
 #        kubectl wait --for=condition=Ready inventory.aap.aap.crossplane.io/example-inventory --timeout=120s
 #   2. Get the inventory ID and update the Host's inventoryId below, then apply the Host block only, or run:
 #        INV_ID=$(kubectl get inventory example-inventory -o jsonpath='{.metadata.annotations.crossplane\.io/external-name}')
 #        kubectl patch host ansible-host --type=merge -p "{\"spec\":{\"forProvider\":{\"inventoryId\":$INV_ID}}}"
-#      (If the Host was not applied yet, set inventoryId in the YAML to $INV_ID and kubectl apply -f deploy/example-inventory-with-host.yaml)
+#      (If the Host was not applied yet, set inventoryId in the YAML to $INV_ID and kubectl apply -f examples/example-inventory-with-host.yaml)
 #
 # Requires the AAP Crossplane provider to be running and ProviderConfig/Secret in place.
 ---
@@ -23,7 +23,7 @@ spec:
     name: default
   deletionPolicy: Delete
 ---
-# Host "ansible" with IP 192.168.68.67. Set inventoryId to the inventory's ID after the inventory is created.
+# Host "ansible". Set inventoryId to the inventory's ID after the inventory is created.
 apiVersion: aap.aap.crossplane.io/v1alpha1
 kind: Host
 metadata:
@@ -32,7 +32,7 @@ spec:
   forProvider:
     name: ansible
     inventoryId: 2   # Replace with the Inventory's ID from: kubectl get inventory example-inventory -o jsonpath='{.metadata.annotations.crossplane\.io/external-name}'
-    variables: '{"ansible_host": "192.168.68.67"}'
+    variables: '{"ansible_host": "192.0.2.10"}'   # documentation-only IP; use your host
     enabled: true
   providerConfigRef:
     name: default

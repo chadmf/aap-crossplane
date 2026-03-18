@@ -12,8 +12,8 @@ provider:
 
 # Crossplane controller: run as a non-root UID in OpenShift's range
 securityContextCrossplane:
-  runAsUser: 1000160000
-  runAsGroup: 1000160000
+  runAsUser: 1000800000
+  runAsGroup: 1000800000
   allowPrivilegeEscalation: false
   readOnlyRootFilesystem: true
 
@@ -24,8 +24,8 @@ podSecurityContextCrossplane:
 
 # RBAC Manager: same UID range so it passes restricted SCC
 securityContextRBACManager:
-  runAsUser: 1000160000
-  runAsGroup: 1000160000
+  runAsUser: 1000800000
+  runAsGroup: 1000800000
   allowPrivilegeEscalation: false
   readOnlyRootFilesystem: true
 
