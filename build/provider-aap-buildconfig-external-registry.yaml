@@ -8,11 +8,11 @@
 #    Or: oc create secret docker-registry provider-aap-push-secret -n crossplane-system \
 #      --docker-server=<registry> --docker-username=<user> --docker-password=<token>
 #
-# 2. Replace OUTPUT_IMAGE below with your image (e.g. quay.io/myorg/aap-crossplane:latest).
+# 2. Replace OUTPUT_IMAGE below with your image (e.g. quay.io/cferman/provider-aap:latest).
 #
-# 3. Apply: kubectl apply -f deploy/provider-aap-buildconfig-external-registry.yaml
+# 3. Apply: kubectl apply -f build/provider-aap-buildconfig-external-registry.yaml
 #
-# 4. Run: ./deploy/build-provider-openshift.sh
+# 4. Run: ./build/build-provider-openshift.sh
 #
 # 5. Set deploy/provider.yaml spec.package to OUTPUT_IMAGE.
 ---
@@ -49,7 +49,7 @@ spec:
     to:
       kind: DockerImage
       # Replace with your registry and image (must be pushable by the build service account):
-      name: quay.io/myorg/aap-crossplane:latest
+      name: quay.io/cferman/provider-aap:latest
     pushSecret:
       name: provider-aap-push-secret
   runPolicy: Serial

@@ -9,11 +9,11 @@ Use this flow when your OpenShift cluster does **not** expose an internal image 
 
 ## 1. Push images to Quay (from your machine)
 
-Crossplane needs a **package** image (xpkg), not just the controller image. If you only push the controller image, the provider will fail with **"package.yaml not found in package"**. See [CROSSPLANE-PACKAGE-IMAGE.md](../deploy/CROSSPLANE-PACKAGE-IMAGE.md) for the full flow. Short version:
+Crossplane needs a **package** image (xpkg), not just the controller image. If you only push the controller image, the provider will fail with **"package.yaml not found in package"**. See [CROSSPLANE-PACKAGE-IMAGE.md](../build/CROSSPLANE-PACKAGE-IMAGE.md) for the full flow. Short version:
 
 1. **Controller image** — build and push with a specific tag (e.g. `v0.1.0`) so the package can reference it:
    ```bash
-   ./deploy/build-provider-image-podman.sh aap-crossplane:v0.1.0
+   ./build/build-provider-image-podman.sh aap-crossplane:v0.1.0
    podman login quay.io -u <your-quay-username>
    podman tag aap-crossplane:v0.1.0 quay.io/<your-quay-username>/aap-crossplane:v0.1.0
    podman push quay.io/<your-quay-username>/aap-crossplane:v0.1.0
@@ -25,7 +25,7 @@ Crossplane needs a **package** image (xpkg), not just the controller image. If y
    crossplane xpkg push quay.io/<your-quay-username>/aap-crossplane:latest -f aap-crossplane.xpkg
    ```
 
-Create the repository `aap-crossplane` under your Quay account if it doesn’t exist. If the repo is **public**, Crossplane can pull the package image with no pull secret—skip step 3. Use step 3 only for **private** repos.
+Create the repository `aap-crossplane` under your Quay account if it doesn't exist. If the repo is **public**, Crossplane can pull the package image with no pull secret—skip step 3. Use step 3 only for **private** repos.
 
 ## 2. Apply provider CRDs on the cluster
 
@@ -39,7 +39,7 @@ kubectl apply -f "${PROVIDER_AAP_DIR}/package/crds/"
 
 ## 3. Quay pull secret (private repos only)
 
-**Public Quay repositories do not need a pull secret.** Apply [provider.yaml](../deploy/provider.yaml) with only `spec.package` set.
+**Public Quay repositories do not need a pull secret.** Apply [deploy/provider.yaml](../../deploy/provider.yaml) with only `spec.package` set.
 
 If the package image is **private**, create a registry secret and reference it on the Provider:
 
@@ -61,7 +61,7 @@ spec:
 
 ## 4. AAP credentials secret
 
-Create the secret with your AAP gateway URL and Application Token (see [aap-credentials-secret.yaml](../deploy/aap-credentials-secret.yaml)). Replace `<aap-namespace>` and `<your-application-token>`:
+Create the secret with your AAP gateway URL and Application Token (see [deploy/aap-credentials-secret.yaml](../../deploy/aap-credentials-secret.yaml)). Replace `<aap-namespace>` and `<your-application-token>`:
 
 ```bash
 AAP_NS="<aap-namespace>"
@@ -72,6 +72,8 @@ kubectl create secret generic aap-credentials -n crossplane-system \
   --dry-run=client -o yaml | kubectl apply -f -
 ```
 
+Or use `./deploy/create-aap-credentials-secret.sh` with `AAP_HOST` and `AAP_TOKEN` (or credentials from `~/.docker/config.json`).
+
 ## 5. ProviderConfig and Provider
 
 ```bash
@@ -79,7 +81,7 @@ kubectl apply -f provider/examples/providerconfig.yaml
 kubectl apply -f deploy/provider.yaml
 ```
 
-Set [provider.yaml](../deploy/provider.yaml) `spec.package` to your package image (e.g. `quay.io/<your-quay-username>/aap-crossplane:latest`) before applying.
+Set [deploy/provider.yaml](../../deploy/provider.yaml) `spec.package` to your package image (e.g. `quay.io/<your-quay-username>/aap-crossplane:latest`) before applying.
 
 ## 6. Verify
 
@@ -92,7 +94,7 @@ Expect the provider `aap-crossplane-provider` **INSTALLED=True** and **HEALTHY=T
 
 ## Reference
 
-- [CROSSPLANE-PACKAGE-IMAGE.md](../deploy/CROSSPLANE-PACKAGE-IMAGE.md) – why you need a package image (xpkg) and how to build/push it  
+- [CROSSPLANE-PACKAGE-IMAGE.md](../build/CROSSPLANE-PACKAGE-IMAGE.md) – why you need a package image (xpkg) and how to build/push it  
 - [openshift-deploy.md](openshift-deploy.md) – full OpenShift deploy guide  
-- [PUSH-TO-QUAY-AND-OPENSHIFT.md](PUSH-TO-QUAY-AND-OPENSHIFT.md) – Quay push and OpenShift  
-- [provider.yaml](../deploy/provider.yaml) – set `spec.package` to your **package** image; `packagePullSecrets` only if the image is private
+- [PUSH-TO-QUAY-AND-OPENSHIFT.md](../build/PUSH-TO-QUAY-AND-OPENSHIFT.md) – Quay push and OpenShift  
+- [deploy/provider.yaml](../../deploy/provider.yaml) – set `spec.package` to your **package** image; `packagePullSecrets` only if the image is private

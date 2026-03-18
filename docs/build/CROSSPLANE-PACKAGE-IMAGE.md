@@ -2,11 +2,11 @@
 
 If Crossplane reports **"package.yaml not found in package"** for your provider image, the image you pushed is the **controller (runtime) image**, but Crossplane expects a **package image** (xpkg).
 
-## What’s the difference?
+## What's the difference?
 
 | Image | Contents | Used by |
 |-------|----------|--------|
-| **Controller image** | Provider binary, Terraform, provider plugins (what [build-provider-image-podman.sh](build-provider-image-podman.sh) builds) | Crossplane runs this as the provider Deployment. |
+| **Controller image** | Provider binary, Terraform, provider plugins (what [build-provider-image-podman.sh](../../build/build-provider-image-podman.sh) builds) | Crossplane runs this as the provider Deployment. |
 | **Package image** (xpkg) | `package.yaml` (or `crossplane.yaml`) metadata and a reference to the controller image | Crossplane pulls this first to know *what* to install and *which* controller image to run. |
 
 `Provider.spec.package` must point at the **package image**, not the controller image. The package image tells Crossplane which controller image to deploy.
@@ -21,7 +21,7 @@ From **aap-crossplane** repo root. On **Apple Silicon (M1/M2)** use **GOARCH=amd
 
 ```bash
 # On M1/M2: GOARCH=amd64 so the cluster (usually amd64) can run the binary
-GOARCH=amd64 ./deploy/build-provider-image-podman.sh aap-crossplane:v0.1.0
+GOARCH=amd64 ./build/build-provider-image-podman.sh aap-crossplane:v0.1.0
 podman tag aap-crossplane:v0.1.0 quay.io/myorg/aap-crossplane:v0.1.0
 podman push quay.io/myorg/aap-crossplane:v0.1.0
 ```
@@ -66,7 +66,7 @@ Replace `/path/to/provider-aap` with the real path. Then delete the provider dep
 
 ### 4. Push the package image to Quay
 
-The Crossplane CLI uses **Docker’s config** (`~/.docker/config.json`) for push, not Podman’s auth file. If you only use Podman, do one of the following so `crossplane xpkg push` can authenticate to Quay:
+The Crossplane CLI uses **Docker's config** (`~/.docker/config.json`) for push, not Podman's auth file. If you only use Podman, do one of the following so `crossplane xpkg push` can authenticate to Quay:
 
 **Option A – Docker config (recommended)**  
 Log in with Docker so credentials are in `~/.docker/config.json`:
@@ -98,7 +98,7 @@ crossplane xpkg push -f aap-crossplane.xpkg quay.io/myorg/aap-crossplane:latest
 
 ### 5. Point the Provider at the package image
 
-[provider.yaml](provider.yaml) should have `spec.package` set to your **package** image (e.g. `quay.io/myorg/aap-crossplane:latest`). Re-apply if you changed it:
+[deploy/provider.yaml](../../deploy/provider.yaml) should have `spec.package` set to your **package** image (e.g. `quay.io/myorg/aap-crossplane:latest`). Re-apply if you changed it:
 
 ```bash
 kubectl apply -f deploy/provider.yaml
@@ -108,5 +108,5 @@ After a short time, the provider should report **INSTALLED=True** and **HEALTHY=
 
 ## Summary
 
-- **Controller image** (e.g. `quay.io/myorg/aap-crossplane:v0.1.0`): built by [build-provider-image-podman.sh](build-provider-image-podman.sh), pushed to Quay. Do **not** set `spec.package` to this.
+- **Controller image** (e.g. `quay.io/myorg/aap-crossplane:v0.1.0`): built by [build-provider-image-podman.sh](../../build/build-provider-image-podman.sh), pushed to Quay. Do **not** set `spec.package` to this.
 - **Package image** (e.g. `quay.io/myorg/aap-crossplane:latest`): built with `crossplane xpkg build -f package --embed-runtime-image=...`, pushed with `crossplane xpkg push`. Set `spec.package` to this so Crossplane finds `package.yaml` and then deploys the controller image referenced inside it.

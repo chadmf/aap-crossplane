@@ -13,11 +13,11 @@ podman tag aap-crossplane:latest quay.io/<your-quay-username>/aap-crossplane:lat
 podman push quay.io/<your-quay-username>/aap-crossplane:latest
 ```
 
-**Note:** Create the repository `aap-crossplane` under your Quay account (`quay.io/<your-quay-username>/aap-crossplane`) if it doesn’t exist. Make the repository **public** so OpenShift can pull without image pull secrets, or add a pull secret to the `crossplane-system` namespace (see [provider.yaml](provider.yaml) `packagePullSecrets`).
+**Note:** Create the repository `aap-crossplane` under your Quay account (`quay.io/<your-quay-username>/aap-crossplane`) if it doesn't exist. Make the repository **public** so OpenShift can pull without image pull secrets, or add a pull secret to the `crossplane-system` namespace (see [deploy/provider.yaml](../deploy/provider.yaml) `packagePullSecrets`).
 
 ## 2. Point OpenShift at the Quay image
 
-Set [provider.yaml](provider.yaml) `spec.package` to your image (e.g. `quay.io/<your-quay-username>/aap-crossplane:latest`), then apply:
+Set [deploy/provider.yaml](../deploy/provider.yaml) `spec.package` to your image (e.g. `quay.io/<your-quay-username>/aap-crossplane:latest`), then apply:
 
 ```bash
 # Ensure your kubeconfig context targets the OpenShift cluster
