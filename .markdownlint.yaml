@@ -1,2 +1,4 @@
 # Ignore 80-character line length
 MD013: false
+# Table pipe spacing / column alignment (noisy for wide doc tables; GitHub renders either style)
+MD060: false

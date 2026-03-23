@@ -12,13 +12,16 @@ Use this flow when your OpenShift cluster does **not** expose an internal image 
 Crossplane needs a **package** image (xpkg), not just the controller image. If you only push the controller image, the provider will fail with **"package.yaml not found in package"**. See [CROSSPLANE-PACKAGE-IMAGE.md](../build/CROSSPLANE-PACKAGE-IMAGE.md) for the full flow. Short version:
 
 1. **Controller image** — build and push with a specific tag (e.g. `v0.1.0`) so the package can reference it:
+
    ```bash
    ./build/build-provider-image-podman.sh aap-crossplane:v0.1.0
    podman login quay.io -u <your-quay-username>
    podman tag aap-crossplane:v0.1.0 quay.io/<your-quay-username>/aap-crossplane:v0.1.0
    podman push quay.io/<your-quay-username>/aap-crossplane:v0.1.0
    ```
+
 2. **Package image** — from the **provider-aap** repo, build the xpkg (embedding the controller image) and push as `:latest`:
+
    ```bash
    cd ../provider-aap
    crossplane xpkg build -f package --embed-runtime-image=quay.io/<your-quay-username>/aap-crossplane:v0.1.0 -o aap-crossplane.xpkg

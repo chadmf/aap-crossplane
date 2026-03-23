@@ -15,8 +15,6 @@ If Crossplane reports **"package.yaml not found in package"** for your provider 
 
 Use two tags so the controller and package images can both live in the same Quay repo (e.g. `quay.io/myorg/aap-crossplane`; replace `myorg` with your Quay org or username).
 
-
-
 Use a specific tag (e.g. `v0.1.0`) for the controller so the package image can reference it.
 
 ### 1. Build and push the controller image (you may have done this already)

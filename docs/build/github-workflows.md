@@ -31,4 +31,3 @@ Runs on `ubuntu-latest`. Validates assets in this repo only; no provider clone.
 | Set up Node.js | Use Node.js 20. |
 | Install markdownlint-cli | Install [markdownlint-cli](https://github.com/igorshubovych/markdownlint-cli). |
 | Lint Markdown | Run markdownlint on `README.md`, `BUILD.md`, and `provider/README.md`. Runs with `continue-on-error: true`. |
-

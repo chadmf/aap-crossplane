@@ -125,7 +125,7 @@ After the first successful `make generate` (or if you run it again), the Upjet p
   make run   # Run provider out-of-cluster (development)
   ```
 
-- **Full build** (binary + container image): Run `make build` when Docker or Podmanmake ru is installed and on `PATH` if you need the provider image.
+- **Full build** (binary + container image): Run `make build` when Docker or Podman is installed and on `PATH` if you need the provider image.
 
 ## Step 5: Test in a Cluster
 
