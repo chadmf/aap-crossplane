@@ -58,7 +58,7 @@ if [[ -z "${AAP_TOKEN:-}" ]]; then
   if [[ -n "${AAP_AUTH_JSON_KEY:-}" ]]; then
     AUTH_KEY="$AAP_AUTH_JSON_KEY"
   else
-    AUTH_KEY=$(echo "$AAP_HOST" | sed -E 's#^https?://##; s#/.*##; s/:\d+$//')
+    AUTH_KEY=$(echo "$AAP_HOST" | sed -E 's#^https?://##; s#/.*##; s/:[0-9]+$//')
   fi
   # Try host key, then host+path, then full URL variants
   AUTH_B64=$(jq -r --arg k "$AUTH_KEY" --arg url "$AAP_HOST" '

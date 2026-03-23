@@ -66,8 +66,8 @@ Log in with Docker so credentials are in `~/.docker/config.json`:
 
 ```bash
 docker login quay.io -u myorg
-or
-podman ogin quay.io -u myorg
+# Or with Podman:
+podman login quay.io -u myorg
 ```
 
 Then push the xpkg:
