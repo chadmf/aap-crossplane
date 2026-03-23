@@ -27,3 +27,9 @@ This directory contains the scaffolding used to build the **Crossplane provider 
 - `aap_workflow_job` → WorkflowJob
 
 Schema and CRD field details come from the [Terraform provider ansible/aap](https://registry.terraform.io/providers/ansible/aap/latest) when you run `make generate.init` and `make generate` in the provider repo.
+
+## HTTP APIs: controller v2 vs `/api/gateway/v1/`
+
+Managed resources use the **controller** API base from platform discovery (`GET {host}/api/` → `apis.controller` → `current_version`, typically **`/api/controller/v2/`** on AAP 2.5+).
+
+**`/api/gateway/v1/`** is the **platform gateway** REST prefix (e.g. **`/api/gateway/v1/status/`**). It is part of the same gateway host but not the URL prefix Upjet resources use for Inventory/Host/Job CRUD. The Terraform client also discovers **`apis.eda`** for event-driven APIs. See **[AAP-HTTP-APIS.md](./AAP-HTTP-APIS.md)** and **`deploy/testing-scripts/validate-aap-api-suite-job.yaml`** (combined ingress + authenticated checks).

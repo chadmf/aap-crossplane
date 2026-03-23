@@ -96,5 +96,5 @@ Expect the provider `aap-crossplane-provider` **INSTALLED=True** and **HEALTHY=T
 
 - [CROSSPLANE-PACKAGE-IMAGE.md](../build/CROSSPLANE-PACKAGE-IMAGE.md) – why you need a package image (xpkg) and how to build/push it  
 - [openshift-deploy.md](openshift-deploy.md) – full OpenShift deploy guide  
-- [PUSH-TO-QUAY-AND-OPENSHIFT.md](../build/PUSH-TO-QUAY-AND-OPENSHIFT.md) – Quay push and OpenShift  
+- [BUILD-PROVIDER-IMAGE.md](../build/BUILD-PROVIDER-IMAGE.md) – Build, push (Quay / internal registry), and OpenShift  
 - [deploy/provider.yaml](../../deploy/provider.yaml) – set `spec.package` to your **package** image; `packagePullSecrets` only if the image is private

@@ -15,18 +15,13 @@ If Crossplane reports **"package.yaml not found in package"** for your provider 
 
 Use two tags so the controller and package images can both live in the same Quay repo (e.g. `quay.io/myorg/aap-crossplane`; replace `myorg` with your Quay org or username).
 
-### 1. Build and push the controller image (you may have done this already)
 
-From **aap-crossplane** repo root. On **Apple Silicon (M1/M2)** use **GOARCH=amd64** so the image runs on typical amd64 OpenShift nodes:
-
-```bash
-# On M1/M2: GOARCH=amd64 so the cluster (usually amd64) can run the binary
-GOARCH=amd64 ./build/build-provider-image-podman.sh aap-crossplane:v0.1.0
-podman tag aap-crossplane:v0.1.0 quay.io/myorg/aap-crossplane:v0.1.0
-podman push quay.io/myorg/aap-crossplane:v0.1.0
-```
 
 Use a specific tag (e.g. `v0.1.0`) for the controller so the package image can reference it.
+
+### 1. Build and push the controller image (you may have done this already)
+
+Follow **[BUILD-PROVIDER-IMAGE.md](BUILD-PROVIDER-IMAGE.md)** from the **aap-crossplane** repo root: build with Podman (use **`GOARCH=amd64`** on Apple Silicon if the cluster is amd64), then tag and push to your registry (e.g. `quay.io/myorg/aap-crossplane:v0.1.0`). That pushed URL is what you pass to **`--embed-runtime-image=`** in step 3.
 
 ### 2. Install Crossplane CLI (if needed)
 
@@ -45,7 +40,7 @@ From the **provider-aap** repo root (with `package/crossplane.yaml` and `package
 cd /path/to/provider-aap
 
 # Build the xpkg; --embed-runtime-image is the controller image you pushed in step 1
-crossplane xpkg build -f package --embed-runtime-image=quay.io/myorg/aap-crossplane:v0.1.0 -o aap-crossplane.xpkg
+crossplane xpkg build -f package --embed-runtime-image=quay.io/myorg/aap-crossplane:latest -o aap-crossplane.xpkg
 ```
 
 This produces `aap-crossplane.xpkg`, which contains the package metadata and the controller image reference.
@@ -73,6 +68,8 @@ Log in with Docker so credentials are in `~/.docker/config.json`:
 
 ```bash
 docker login quay.io -u myorg
+or
+podman ogin quay.io -u myorg
 ```
 
 Then push the xpkg:
@@ -108,5 +105,5 @@ After a short time, the provider should report **INSTALLED=True** and **HEALTHY=
 
 ## Summary
 
-- **Controller image** (e.g. `quay.io/myorg/aap-crossplane:v0.1.0`): built by [build-provider-image-podman.sh](../../build/build-provider-image-podman.sh), pushed to Quay. Do **not** set `spec.package` to this.
+- **Controller image** (e.g. `quay.io/myorg/aap-crossplane:v0.1.0`): build and push per [BUILD-PROVIDER-IMAGE.md](BUILD-PROVIDER-IMAGE.md) (uses [build-provider-image-podman.sh](../../build/build-provider-image-podman.sh)). Do **not** set `spec.package` to this.
 - **Package image** (e.g. `quay.io/myorg/aap-crossplane:latest`): built with `crossplane xpkg build -f package --embed-runtime-image=...`, pushed with `crossplane xpkg push`. Set `spec.package` to this so Crossplane finds `package.yaml` and then deploys the controller image referenced inside it.

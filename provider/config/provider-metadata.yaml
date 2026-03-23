@@ -1,5 +1,8 @@
 # Provider metadata for Upjet code generation.
 # name must match TERRAFORM_PROVIDER_SOURCE (e.g. ansible/aap).
+#
+# HTTP surfaces: controller API (discovered via GET {host}/api/ -> apis.controller -> current_version,
+# typically /api/controller/v2/) vs platform /api/gateway/v1/ — see ../AAP-HTTP-APIS.md.
 # Resources listed here can have description, examples, and argumentDocs used by the generator.
 # Schema is fetched at build time via make generate.init -> config/schema.json
 name: ansible/aap

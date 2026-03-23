@@ -24,7 +24,7 @@ This is a prototype for creating a crossplane provider for the Ansible Automatio
   - [6.6 References](#66-references)
 - [7. Documentation](#7-documentation)
   - [Build vs deploy overview](docs/README.md)
-  - Build (provider image/package): [Build image (Podman)](docs/build/BUILD-PROVIDER-IMAGE.md), [Package image (xpkg)](docs/build/CROSSPLANE-PACKAGE-IMAGE.md), [Push to Quay](docs/build/PUSH-TO-QUAY-AND-OPENSHIFT.md)
+  - Build (provider image/package): [Build & push image (Podman)](docs/build/BUILD-PROVIDER-IMAGE.md), [Package image (xpkg)](docs/build/CROSSPLANE-PACKAGE-IMAGE.md)
   - Deploy: [OpenShift (full guide)](docs/deploy/openshift-deploy.md), [Deploy via Quay](docs/deploy/DEPLOY-AAP-PROVIDER-OPENSHIFT.md), [CRC / OpenShift Local](docs/deploy/DEPLOY-ON-CRC.md), [Validate provider vs AAP API](docs/deploy/VALIDATE-AAP-PROVIDER-API.md)
 - [Workflows (CI)](workflows.md)
 
@@ -164,7 +164,7 @@ oc get pods -n crossplane-system
    - Create a `Provider` resource that points to your provider image, or use `kubectl crossplane install provider` / the Crossplane CLI with the provider package.
    - Ensure the provider’s ServiceAccount has RBAC that allows reading Secrets (in the namespace where the `ProviderConfig` secret lives) and managing the provider’s CRDs.
 
-2. **Create the AAP credentials Secret** in the same namespace as the provider (e.g. `crossplane-system`), with the AAP URL and an Application Token. See [deploy/aap-credentials-secret.yaml](deploy/aap-credentials-secret.yaml) for the format and `kubectl create secret` / `./deploy/create-aap-credentials-secret.sh` usage. Use the AAP URL from the Automation controller route/ingress (AAP 2.5+: gateway URL) and an Application Token scoped to the right organization.
+2. **Create the AAP credentials Secret** in the same namespace as the provider (e.g. `crossplane-system`), with the **gateway root** URL (no `/api/controller` suffix; the embedded Terraform **ansible/aap** client discovers the controller API via `GET {host}/api/`) and an Application Token. See [deploy/aap-credentials-secret.yaml](deploy/aap-credentials-secret.yaml) and `./deploy/create-aap-credentials-secret.sh`. From in-cluster Pods, prefer gateway Service DNS (e.g. `http://aap.<aap-namespace>.svc.cluster.local`).
 
 3. **Create a ProviderConfig** that references this Secret (see [provider/examples/providerconfig.yaml](provider/examples/providerconfig.yaml)). Set `spec.credentials.secretRef` to the Secret name and key above.
 
@@ -192,5 +192,6 @@ oc get pods -n crossplane-system
 Detailed guides are in [`docs/`](docs/), split into **build** (provider image/package) and **deploy** (Crossplane, credentials, provider install):
 
 - [Build vs deploy overview](docs/README.md)
-- **Build** (provider image/package): [Build image (Podman)](docs/build/BUILD-PROVIDER-IMAGE.md), [Package image (xpkg)](docs/build/CROSSPLANE-PACKAGE-IMAGE.md), [Push to Quay](docs/build/PUSH-TO-QUAY-AND-OPENSHIFT.md)
+- **Build** (provider image/package): [Build & push image (Podman)](docs/build/BUILD-PROVIDER-IMAGE.md), [Package image (xpkg)](docs/build/CROSSPLANE-PACKAGE-IMAGE.md)
 - **Deploy**: [OpenShift (full guide)](docs/deploy/openshift-deploy.md), [Deploy via Quay](docs/deploy/DEPLOY-AAP-PROVIDER-OPENSHIFT.md), [CRC / OpenShift Local](docs/deploy/DEPLOY-ON-CRC.md), [Validate provider vs AAP API](docs/deploy/VALIDATE-AAP-PROVIDER-API.md)
+- **Provider HTTP APIs** (controller v2 vs `/api/gateway/v1/`): [provider/AAP-HTTP-APIS.md](provider/AAP-HTTP-APIS.md)

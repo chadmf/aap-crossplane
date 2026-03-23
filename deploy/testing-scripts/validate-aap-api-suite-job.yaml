@@ -1,0 +1,209 @@
+# Combined AAP API validation (replaces validate-aap-api-job, validate-aap-gateway-v1-job,
+# and validate-aap-provider-api-alignment).
+#
+# Runs in order:
+#   1) Ingress / Route pattern (no credentials): internal OpenShift ingress + Host header —
+#      GET /api/controller/v2/ and GET /api/gateway/v1/status/ (CRC: nip.io resolves to 127.0.0.1
+#      inside Pods without this). Skip with AAP_SKIP_INGRESS_CHECKS=1.
+#   2) Authenticated checks (optional): if aap-credentials is mounted, same discovery as
+#      Terraform ansible/aap (GET {host}/api/ → apis.controller → current_version), controller
+#      resource endpoints, gateway v1, apis.eda. Secret volume is optional: mount for full suite.
+#
+# Env (phase 1):
+#   AAP_SKIP_INGRESS_CHECKS — set to 1 to skip phase 1
+#   AAP_INGRESS_BASE        — default: router-internal-default (HTTPS, no trailing slash)
+#   AAP_ROUTE_HOST          — default: CRC AAP route host (Host: header)
+#
+# Phase 2: JSON host/token from Secret key credentials (see create-aap-credentials-secret.sh).
+#
+# Run:
+#   oc delete job validate-aap-api-suite -n crossplane-system --ignore-not-found
+#   oc apply -f deploy/testing-scripts/validate-aap-api-suite-job.yaml
+#   oc wait --for=condition=complete job/validate-aap-api-suite -n crossplane-system --timeout=300s
+#   oc logs job/validate-aap-api-suite -n crossplane-system
+#
+# Mount Secret aap-credentials for phase 2 (discovery + authenticated checks). The volume is
+# optional: without it, only phase 1 (ingress) runs.
+#
+# See provider/AAP-HTTP-APIS.md
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: validate-aap-api-suite
+  namespace: crossplane-system
+spec:
+  ttlSecondsAfterFinished: 600
+  backoffLimit: 1
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: validate
+          image: curlimages/curl:latest
+          env:
+            - name: AAP_INGRESS_BASE
+              value: "https://router-internal-default.openshift-ingress.svc.cluster.local"
+            - name: AAP_ROUTE_HOST
+              value: "aap-aap-operator.apps.127.0.0.1.nip.io"
+            - name: AAP_SKIP_INGRESS_CHECKS
+              value: "0"
+          command:
+            - /bin/sh
+            - -c
+            - |
+              FAILED=0
+
+              http_ok_controller() {
+                case "$1" in 200|302|401) return 0 ;; *) return 1 ;; esac
+              }
+              http_ok_gateway() {
+                case "$1" in 200|302|401|403) return 0 ;; *) return 1 ;; esac
+              }
+
+              # --- Phase 1: ingress + Host (unauthenticated) ---
+              if [ "${AAP_SKIP_INGRESS_CHECKS}" = "1" ]; then
+                echo "=== Phase 1: SKIPPED (AAP_SKIP_INGRESS_CHECKS=1) ==="
+              else
+                echo "=== Phase 1: Ingress connectivity (internal router + Host header) ==="
+                BASE=$(echo "${AAP_INGRESS_BASE:-}" | sed 's:/*$::')
+                HOSTHDR="${AAP_ROUTE_HOST:-}"
+                for ITEM in "controller|/api/controller/v2/" "gateway_v1|/api/gateway/v1/status/"; do
+                  LABEL="${ITEM%%|*}"
+                  SUFFIX="${ITEM#*|}"
+                  case "$SUFFIX" in /*) ;; *) SUFFIX="/${SUFFIX}" ;; esac
+                  URL="${BASE}${SUFFIX}"
+                  code=$(curl -s -o /dev/null -w "%{http_code}" -k -H "Host: ${HOSTHDR}" "$URL") || true
+                  case "$code" in [0-9][0-9][0-9]) ;; *) code="000" ;; esac
+                  echo "  ${LABEL}: GET ${URL} (Host: ${HOSTHDR}) -> HTTP ${code}"
+                  if [ "$LABEL" = "controller" ]; then
+                    http_ok_controller "$code" || { echo "    FAIL: expected 200/302/401"; FAILED=1; }
+                  else
+                    http_ok_gateway "$code" || { echo "    FAIL: expected 200/302/401/403"; FAILED=1; }
+                  fi
+                done
+                echo "  aap-credentials host: gateway root only, e.g. http://aap.<ns>.svc.cluster.local"
+                echo ""
+              fi
+
+              # --- Phase 2: authenticated (Terraform-equivalent discovery) ---
+              CRED_FILE="/etc/aap-credentials/credentials"
+              if [ ! -f "$CRED_FILE" ]; then
+                echo "=== Phase 2: SKIPPED (no Secret mounted at /etc/aap-credentials) ==="
+                echo "  Mount aap-credentials for discovery + controller/gateway/EDA checks."
+              else
+                echo "=== Phase 2: Authenticated API (from aap-credentials) ==="
+                set -e
+                RAW=$(cat "$CRED_FILE")
+                HOST=$(echo "$RAW" | sed -n 's/.*"host"\s*:\s*"\([^"]*\)".*/\1/p')
+                TOKEN=$(echo "$RAW" | sed -n 's/.*"token"\s*:\s*"\([^"]*\)".*/\1/p')
+                USER=$(echo "$RAW" | sed -n 's/.*"username"\s*:\s*"\([^"]*\)".*/\1/p')
+                PASS=$(echo "$RAW" | sed -n 's/.*"password"\s*:\s*"\([^"]*\)".*/\1/p')
+                if [ -z "$HOST" ]; then
+                  echo "ERROR: Could not parse host from credentials"; exit 1
+                fi
+                AUTH=""
+                if [ -n "$TOKEN" ]; then
+                  AUTH="Authorization: Bearer $TOKEN"
+                elif [ -n "$USER" ] && [ -n "$PASS" ]; then
+                  AUTH="Authorization: Basic $(echo -n "$USER:$PASS" | base64 | tr -d '\n')"
+                else
+                  echo "ERROR: Need token or username+password in credentials"; exit 1
+                fi
+                HOSTN=$(echo "$HOST" | sed 's:/*$::')
+                GATEWAY_ROOT="$HOSTN"
+                case "$GATEWAY_ROOT" in
+                  */api/controller|*/api/controller/)
+                    echo "WARN: host ends with /api/controller — stripping for discovery. Use gateway root in Secret."
+                    GATEWAY_ROOT=$(echo "$GATEWAY_ROOT" | sed 's|/api/controller/*$||')
+                    ;;
+                esac
+                echo "AAP host (secret): $HOSTN"
+                echo "Gateway root: $GATEWAY_ROOT"
+                echo ""
+
+                DISC_CODE=$(curl -s -k -o /tmp/disc.json -w "%{http_code}" -H "$AUTH" "$GATEWAY_ROOT/api/")
+                if [ "$DISC_CODE" != "200" ]; then
+                  echo "FAIL: GET $GATEWAY_ROOT/api/ -> HTTP $DISC_CODE"; exit 1
+                fi
+                echo "OK: GET $GATEWAY_ROOT/api/ -> 200"
+
+                CTRL_LINK=$(sed -n 's/.*"controller"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' /tmp/disc.json | head -1)
+                if [ -z "$CTRL_LINK" ]; then echo "FAIL: missing apis.controller"; exit 1; fi
+                if echo "$CTRL_LINK" | grep -q '^https\?://'; then SECOND_URL="$CTRL_LINK"
+                else SECOND_URL="$GATEWAY_ROOT$CTRL_LINK"; fi
+                curl -s -k -o /tmp/v2root.json -H "$AUTH" "$SECOND_URL" || true
+                V2=$(sed -n 's/.*"current_version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' /tmp/v2root.json | head -1)
+                if [ -z "$V2" ]; then echo "FAIL: current_version at $SECOND_URL"; exit 1; fi
+                if echo "$V2" | grep -q '^https\?://'; then API_BASE=$(echo "$V2" | sed 's:/*$::')
+                else API_BASE="$GATEWAY_ROOT$(echo "$V2" | sed 's:/*$::')"; fi
+                echo "OK: Controller API base: $API_BASE"
+                echo ""
+
+                ROOT=$(curl -s -k -H "$AUTH" "$API_BASE/" || echo "{}")
+                echo "--- Controller v2 root (keys) ---"
+                echo "$ROOT" | tr ',' '\n' | grep -oE '"[a-z_]+"' | tr -d '"' | sort -u || true
+                echo ""
+
+                echo "--- Managed resource endpoints ---"
+                check() {
+                  path=$1
+                  code=$(curl -s -k -o /tmp/out -w "%{http_code}" -H "$AUTH" "${API_BASE}${path}")
+                  if [ "$code" = "200" ]; then
+                    count=$(grep -oE '"count":[[:space:]]*[0-9]*' /tmp/out | head -1)
+                    echo "  OK   ${path} -> $code $count"
+                  else
+                    echo "  ---  ${path} -> HTTP $code"
+                  fi
+                }
+                check "/inventories/"
+                check "/hosts/"
+                check "/groups/"
+                check "/jobs/"
+                check "/workflow_jobs/"
+                check "/job_templates/"
+                check "/workflow_job_templates/"
+                check "/organizations/"
+                echo ""
+
+                echo "--- Platform gateway v1 (authenticated) ---"
+                for gpath in /api/gateway/v1/status/ /api/gateway/v1/; do
+                  gc=$(curl -s -k -o /dev/null -w "%{http_code}" -H "$AUTH" "${GATEWAY_ROOT}${gpath}" 2>/dev/null || echo "000")
+                  echo "  GET ${GATEWAY_ROOT}${gpath} -> HTTP $gc"
+                done
+                echo ""
+
+                EDA_LINK=$(sed -n 's/.*"eda"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' /tmp/disc.json | head -1)
+                if [ -n "$EDA_LINK" ]; then
+                  echo "--- apis.eda ---"
+                  if echo "$EDA_LINK" | grep -q '^https\?://'; then EDA_FIRST="$EDA_LINK"
+                  else EDA_FIRST="${GATEWAY_ROOT}${EDA_LINK}"; fi
+                  ec=$(curl -s -k -o /dev/null -w "%{http_code}" -H "$AUTH" "$EDA_FIRST" 2>/dev/null || echo "000")
+                  echo "  GET $EDA_FIRST -> HTTP $ec"
+                else
+                  echo "--- apis.eda: (absent) ---"
+                fi
+                echo ""
+                echo "--- Phase 2 summary ---"
+                echo "  MRs use controller base above; /api/gateway/v1/ is platform gateway — provider/AAP-HTTP-APIS.md"
+                set +e
+              fi
+
+              echo ""
+              if [ "$FAILED" != "0" ]; then
+                echo "SUITE FAILED: phase 1 ingress checks failed. Fix AAP_ROUTE_HOST / AAP_INGRESS_BASE or set AAP_SKIP_INGRESS_CHECKS=1."
+                exit 1
+              fi
+              echo "SUITE COMPLETE."
+          volumeMounts:
+            - name: creds
+              mountPath: /etc/aap-credentials
+              readOnly: true
+      volumes:
+        - name: creds
+          secret:
+            secretName: aap-credentials
+            optional: true
+            items:
+              - key: credentials
+                path: credentials

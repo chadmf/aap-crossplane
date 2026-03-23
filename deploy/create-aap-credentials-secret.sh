@@ -8,7 +8,10 @@
 #    Copy the token value (it is shown only once).
 #
 # 2. Set AAP_HOST and either AAP_TOKEN or add AAP to .docker/config.json, then run:
-#    export AAP_HOST="http://aap-gateway.<aap-namespace>.svc.cluster.local/api/controller"
+#    # Gateway root only — no /api/controller (provider discovers that via GET {host}/api/)
+#    export AAP_HOST="http://aap-gateway.<aap-namespace>.svc.cluster.local"
+#    # Or if your cluster has no aap-gateway Service, use the gateway entry Service (often `aap`):
+#    # export AAP_HOST="http://aap.<aap-namespace>.svc.cluster.local"
 #    export AAP_TOKEN="<paste-your-application-token>"   # optional if using config.json
 #    ./deploy/create-aap-credentials-secret.sh
 #
@@ -18,8 +21,9 @@
 #    base64(username:token); script uses the part after ":" as the token.
 #    Requires jq when using config.json.
 #
-# AAP 2.5+: host must include /api/controller so the provider uses /api/controller/v2/.
-# From outside the cluster use your route/URL, e.g. https://aap.example.com/api/controller
+# AAP 2.5+: use a gateway *entry* Service (aap-gateway, or often `aap` / `aap-api` when aap-gateway is absent).
+# Do not use the deprecated controller Service (aap-controller-service).
+# From outside the cluster use your route URL without a path suffix, e.g. https://aap.example.com
 #
 set -euo pipefail
 
@@ -32,7 +36,8 @@ if [[ -z "${AAP_TOKEN:-}" ]]; then
   if [[ -z "${AAP_HOST:-}" ]]; then
     echo "Usage: Set AAP_HOST and AAP_TOKEN (or add AAP entry to .docker/config.json), then run $0"
     echo ""
-    echo "  export AAP_HOST=\"http://aap-gateway.aap-operator.svc.cluster.local/api/controller\""
+    echo "  export AAP_HOST=\"http://aap-gateway.aap-operator.svc.cluster.local\""
+    echo "  # or: http://aap.aap-operator.svc.cluster.local  (if no aap-gateway Service)"
     echo "  export AAP_TOKEN=\"<your-application-token-from-aap-ui>\"   # or use config.json"
     echo "  $0"
     echo ""
@@ -81,7 +86,8 @@ fi
 if [[ -z "${AAP_HOST:-}" ]]; then
   echo "Usage: Set AAP_HOST (and optionally AAP_TOKEN or use .docker/config.json), then run $0"
   echo ""
-  echo "  export AAP_HOST=\"http://aap-gateway.aap-operator.svc.cluster.local/api/controller\""
+  echo "  export AAP_HOST=\"http://aap-gateway.aap-operator.svc.cluster.local\""
+  echo "  # or http://aap.aap-operator.svc.cluster.local"
   echo "  $0"
   exit 1
 fi

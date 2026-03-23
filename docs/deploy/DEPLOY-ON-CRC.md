@@ -2,15 +2,6 @@
 
 This guide is for **CodeReady Containers (CRC)** / **OpenShift Local**: a single-node OpenShift cluster on your laptop. It covers Crossplane, the AAP Crossplane provider package image, OpenShift SCC (UID range), and reaching AAP from CRC.
 
-## CRC vs full OpenShift
-
-| Topic | On CRC |
-|-------|--------|
-| **BuildConfig** | Often **not** available. Use [Podman + Quay](DEPLOY-AAP-PROVIDER-OPENSHIFT.md) (or another registry) for provider images; do not rely on `build-provider-openshift.sh` unless your CRC has build APIs. |
-| **Internal registry** | May be available; many users still push to **Quay** so the cluster can pull without extra registry setup. |
-| **Node arch** | CRC VM is usually **linux/amd64**. Build the controller image for **amd64** (`GOARCH=amd64` on Apple Silicon). Build the **xpkg** on **amd64** too (see [CROSSPLANE-PACKAGE-IMAGE.md](../build/CROSSPLANE-PACKAGE-IMAGE.md) § Apple Silicon). |
-| **Namespace UID range** | **Different per cluster.** You must align Helm values and `DeploymentRuntimeConfig` with `crossplane-system`'s range (steps below). |
-
 ## Prerequisites
 
 - **CRC** installed and running: `crc start`
@@ -108,9 +99,73 @@ oc get events -n crossplane-system --field-selector involvedObject.kind=ReplicaS
 
 **SCC / UID range:** If you see `runAsUser: Invalid value: 2000: must be in the ranges: [1000…]`, Crossplane's `DeploymentRuntimeConfig` named **`default`** is empty or wrong. Apply [deploy/deployment-runtime-config-openshift.yaml](../../deploy/deployment-runtime-config-openshift.yaml) with `runAsUser`/`runAsGroup` set to the **first number** from your namespace UID range (step 1), then wait for the provider deployment to roll out (or delete the provider deployment so it is recreated).
 
-## 7. AAP not on CRC
+## 7. Validate the deployment on CRC
 
-If AAP runs **outside** CRC (e.g. on another OpenShift or on your LAN), set `AAP_HOST` in the credentials secret to a URL reachable **from inside CRC pods** (not `localhost`). Examples: a Route hostname, or your host's IP and a forwarded port.
+Run these after Crossplane and (optionally) the AAP provider are installed. Use `eval $(crc oc-env)` if `oc` is not already pointed at CRC.
+
+### Crossplane core
+
+```bash
+oc get pods -n crossplane-system
+# Expect: crossplane-* and crossplane-rbac-manager-* Running (2/2 or 1/1)
+
+oc get crd | grep -E 'crossplane\.io|pkg\.crossplane\.io' | head -20
+
+helm list -n crossplane-system
+# Expect: crossplane deployed
+```
+
+### AAP provider package (if installed)
+
+```bash
+oc get provider.pkg.crossplane.io -o wide
+# Expect: INSTALLED=True, HEALTHY=True
+
+oc describe provider.pkg.crossplane.io aap-crossplane-provider | tail -30
+# Check Conditions and Events for unpack/pull/runtime errors
+
+oc get pods -n crossplane-system -l pkg.crossplane.io/provider=aap-crossplane-provider
+# Expect: Running, READY 1/1
+```
+
+### ProviderConfig and credentials
+
+```bash
+oc get providerconfig
+oc describe providerconfig default
+# Expect: healthy / ready (no invalid secret reference)
+
+oc get secret aap-credentials -n crossplane-system
+# Expect: exists if you use the default ProviderConfig
+```
+
+Confirm `aap-credentials` **`host`** is the **gateway root** (no `/api/controller` suffix): the embedded Terraform provider calls **`GET {host}/api/`** and uses **`current_version`** as the controller API base (same as **`/api/controller/v2/`** on AAP 2.5+). See [create-aap-credentials-secret.sh](../../deploy/create-aap-credentials-secret.sh).
+
+### AAP API validation suite (optional Job)
+
+One Job covers **ingress / Route checks** (CRC) and **authenticated** discovery (when `aap-credentials` is mounted):
+
+- **Phase 1:** Internal ingress **`router-internal-default.openshift-ingress.svc.cluster.local`** + **`Host:`** (default **`aap-aap-operator.apps.127.0.0.1.nip.io`**) — unauthenticated GET **`/api/controller/v2/`** and **`/api/gateway/v1/status/`**. *Why:* nip.io hostnames resolve to **127.0.0.1** inside Pods; **`Host:`** fixes that. Set **`AAP_SKIP_INGRESS_CHECKS=1`** on the Job to skip phase 1.
+- **Phase 2:** If Secret **`aap-credentials`** exists, mounts it (**optional** volume) and runs Terraform-equivalent **`GET {host}/api/`** discovery, controller resource paths, gateway v1, **`apis.eda`**.
+
+For **`aap-credentials`**, use gateway **Service** DNS as **`host`** with **no path** (e.g. **`http://aap.aap-operator.svc.cluster.local`**). See [VALIDATE-AAP-PROVIDER-API.md](VALIDATE-AAP-PROVIDER-API.md) and [provider/AAP-HTTP-APIS.md](../../provider/AAP-HTTP-APIS.md).
+
+```bash
+oc delete job validate-aap-api-suite -n crossplane-system --ignore-not-found
+oc apply -f deploy/testing-scripts/validate-aap-api-suite-job.yaml
+oc wait --for=condition=complete job/validate-aap-api-suite -n crossplane-system --timeout=300s
+oc logs job/validate-aap-api-suite -n crossplane-system
+```
+
+Expect **`SUITE COMPLETE.`** Phase 1 expects HTTP 200/302/401 (controller) and 200/302/401/403 (gateway v1). `curl` uses **`-k`** for dev TLS.
+
+### End-to-end managed resource (optional)
+
+```bash
+oc apply -f examples/example-inventory.yaml
+oc describe inventory example-inventory
+# Expect Ready/Synced when AAP accepts the create
+```
 
 ## See also
 
