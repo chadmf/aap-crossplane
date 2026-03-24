@@ -125,12 +125,12 @@ After the first successful `make generate` (or if you run it again), the Upjet p
   make run   # Run provider out-of-cluster (development)
   ```
 
-- **Full build** (binary + container image): Run `make build` when Docker is installed and on `PATH` if you need the provider image.
+- **Full build** (binary + container image): Run `make build` when Docker or Podman is installed and on `PATH` if you need the provider image.
 
 ## Step 5: Test in a Cluster
 
 1. Install Crossplane (and the provider) in a Kind cluster.
-2. Create a `ProviderConfig` that references a Secret with AAP URL and token (or username/password). See [provider/examples/](provider/examples/).
+2. Create a `ProviderConfig` that references a Secret with AAP **gateway root** URL (no `/api/controller` path; the embedded **ansible/aap** provider discovers the controller API via `GET {host}/api/`) and token (or username/password). See [provider/examples/](provider/examples/) and [deploy/create-aap-credentials-secret.sh](deploy/create-aap-credentials-secret.sh).
 3. Apply a managed resource (e.g. `Inventory` or `Group`) and verify the resource appears in the AAP UI.
 
 ## Scaffold Contents (This Repo)
@@ -140,6 +140,7 @@ After the first successful `make generate` (or if you run it again), the Upjet p
 | `provider/Makefile.aap` | Terraform AAP provider Makefile variables (use version 1.4.0). |
 | `provider/config/` | Upjet provider config: `provider.go` (includes `GetProvider()` and `GetProviderNamespaced()` returning `nil`), `external_name.go`, and per-resource configs for AAP (group, host, inventory, job, workflow_job). |
 | `provider/examples/` | Example `ProviderConfig` and sample MR manifests. |
+| `provider/AAP-HTTP-APIS.md` | Controller v2 vs `/api/gateway/v1/` vs EDA discovery (Terraform client behavior). |
 | `hack/prepare-aap.sh` | Default values for `hack/prepare.sh` when initializing the AAP provider from the template. |
 
 ## Security Reminders

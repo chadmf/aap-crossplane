@@ -14,5 +14,5 @@ spec:
       namespace: crossplane-system
       key: credentials
 # Optional: provider-specific connection settings (if supported by the generated CRD)
-#  host: "https://aap.example.com"
+#  host: "https://aap.example.com"   # gateway root only; credentials secret normally supplies this
 #  insecureSkipVerify: false

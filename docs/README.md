@@ -8,9 +8,8 @@ Scripts and manifests for building the provider **controller image** and (option
 
 | Doc | Description |
 |-----|-------------|
-| [build/BUILD-PROVIDER-IMAGE.md](build/BUILD-PROVIDER-IMAGE.md) | Build the controller image with Podman |
+| [build/BUILD-PROVIDER-IMAGE.md](build/BUILD-PROVIDER-IMAGE.md) | Build the controller image with Podman; push (OpenShift registry, Quay, other) and verify on cluster |
 | [build/CROSSPLANE-PACKAGE-IMAGE.md](build/CROSSPLANE-PACKAGE-IMAGE.md) | Package image (xpkg) vs controller image; build and push xpkg |
-| [build/PUSH-TO-QUAY-AND-OPENSHIFT.md](build/PUSH-TO-QUAY-AND-OPENSHIFT.md) | Push image to Quay and point OpenShift at it |
 
 **Artifacts:** [build/](../build/) — `build-provider-image-podman.sh`, `build-provider-openshift.sh`, `provider-aap-buildconfig.yaml`, `provider-aap-buildconfig-external-registry.yaml`
 
@@ -25,7 +24,7 @@ Steps and manifests for installing Crossplane, creating AAP credentials, install
 | [deploy/DEPLOY-ON-CRC.md](deploy/DEPLOY-ON-CRC.md) | Deploy on CRC / OpenShift Local (UID range, Quay) |
 | [deploy/VALIDATE-AAP-PROVIDER-API.md](deploy/VALIDATE-AAP-PROVIDER-API.md) | Validate provider CRDs vs running AAP API |
 
-**Artifacts:** [deploy/](../deploy/) — Crossplane subscription/Helm values, `provider.yaml`, credentials script, runtime config, testing jobs.
+**Artifacts:** [deploy/](../deploy/) — Crossplane subscription/Helm values, `provider.yaml`, credentials script, runtime config; API checks: [deploy/testing-scripts/validate-aap-api-suite-job.yaml](../deploy/testing-scripts/validate-aap-api-suite-job.yaml).
 
 ## Quick links
 

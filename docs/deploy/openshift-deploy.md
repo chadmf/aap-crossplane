@@ -73,15 +73,16 @@ The AAP provider is built from this repo's scaffold (see [BUILD.md](../../BUILD.
      --dry-run=client -o yaml | kubectl apply -f -
    ```
 
-   See [deploy/aap-credentials-secret.yaml](../../deploy/aap-credentials-secret.yaml) for details and username/password fallback. Or use `./deploy/create-aap-credentials-secret.sh` (optionally with credentials from `~/.docker/config.json`). If the provider uses `/api/v2/` but your AAP exposes `/api/controller/v2/`, set `AAP_HOST` to include the path, e.g. `http://aap-gateway.<ns>.svc.cluster.local/api/controller`.
+   See [deploy/aap-credentials-secret.yaml](../../deploy/aap-credentials-secret.yaml) for details and username/password fallback. Or use `./deploy/create-aap-credentials-secret.sh` (optionally with credentials from `~/.docker/config.json`). Set **`AAP_HOST`** to the **gateway root** (e.g. `http://aap.<ns>.svc.cluster.local`) so **`GET {host}/api/`** succeeds; the embedded Terraform **ansible/aap** provider discovers **`current_version`** (the controller API base, i.e. **`/api/controller/v2/`** on AAP 2.5+). Do **not** append **`/api/controller`** to `host`.
 
 3. **Apply ProviderConfig**: `kubectl apply -f provider/examples/providerconfig.yaml`
 
-4. **Validate against the AAP API**: The validation job uses the gateway URL and `/api/controller/v2/`. If your AAP is in a different namespace or gateway service name, edit [deploy/testing-scripts/validate-aap-api-job.yaml](../../deploy/testing-scripts/validate-aap-api-job.yaml) and set `HOST` to your gateway URL. Then:
+4. **Validate against the AAP API**: Use the combined suite [validate-aap-api-suite-job.yaml](../../deploy/testing-scripts/validate-aap-api-suite-job.yaml) — **internal ingress** + **`Host:`** (CRC), optional **`aap-credentials`** for full discovery. See [provider/AAP-HTTP-APIS.md](../../provider/AAP-HTTP-APIS.md). Then:
 
    ```bash
-   kubectl apply -f deploy/testing-scripts/validate-aap-api-job.yaml
-   kubectl logs job/validate-aap-api -n crossplane-system -f
+   kubectl apply -f deploy/testing-scripts/validate-aap-api-suite-job.yaml
+   kubectl wait --for=condition=complete job/validate-aap-api-suite -n crossplane-system --timeout=300s
+   kubectl logs job/validate-aap-api-suite -n crossplane-system
    ```
 
    Expect: `SUCCESS: AAP API is reachable from the cluster.`

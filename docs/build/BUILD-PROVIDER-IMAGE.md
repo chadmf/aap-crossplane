@@ -1,6 +1,8 @@
-# Build AAP Crossplane provider image with Podman
+# Build and push the AAP Crossplane provider image (Podman)
 
-This document describes how to build the AAP Crossplane provider **controller** image using **Podman** (no Docker required). Crossplane installs providers from a **package** image (xpkg) that references this controller image. If you see **"package.yaml not found in package"**, you need to build and push the package image too — see [CROSSPLANE-PACKAGE-IMAGE.md](CROSSPLANE-PACKAGE-IMAGE.md).
+This guide covers building the AAP Crossplane provider **controller** image with **Podman**, pushing it to a registry (**OpenShift internal**, **Quay**, or other), and pointing **OpenShift** at it.
+
+Crossplane installs providers from a **package** image (xpkg) that references this controller image. If you see **"package.yaml not found in package"**, build and push the **package** image too — see [CROSSPLANE-PACKAGE-IMAGE.md](CROSSPLANE-PACKAGE-IMAGE.md).
 
 ## Prerequisites
 
@@ -8,7 +10,7 @@ This document describes how to build the AAP Crossplane provider **controller** 
 - **Go** (to build the provider binary)
 - **provider-aap** repo (the Upjet-based AAP provider). By default the script expects it as a sibling of aap-crossplane: `../provider-aap`. Override with `PROVIDER_AAP_DIR`.
 
-**Apple Silicon (M1/M2):** If your cluster nodes are amd64 (typical for OpenShift), build for amd64: `GOARCH=amd64 ./build/build-provider-image-podman.sh ...`. Otherwise the provider pod will fail with "Exec format error".
+**Apple Silicon (M1/M2):** If your cluster nodes are amd64 (typical for OpenShift), build for amd64: `GOARCH=amd64 ./build/build-provider-image-podman.sh ...`. Otherwise the provider pod can fail with **Exec format error**.
 
 ## Build
 
@@ -31,13 +33,13 @@ The script:
 2. Copies the Dockerfile, `terraformrc.hcl`, and binary from provider-aap into a temp build context.
 3. Runs `podman build` with Terraform 1.5.7 and the Ansible AAP Terraform provider (e.g. 1.4.0), matching provider-aap's `Makefile.aap`.
 
-## Use the image
+## Push the image
 
-### OpenShift
+Crossplane needs a **fully qualified image name** (`registry/repository:tag`) that your cluster can pull.
 
-Crossplane requires a **fully qualified image name** (registry/repository:tag). Use one of these approaches:
+### OpenShift integrated registry
 
-**Option A – Push to the internal OpenShift registry** (if your cluster exposes the image registry):
+If the cluster exposes the internal image registry:
 
 ```bash
 # Get registry route (if it exists)
@@ -48,28 +50,64 @@ podman tag aap-crossplane:latest $REGISTRY/crossplane-system/aap-crossplane:late
 podman push $REGISTRY/crossplane-system/aap-crossplane:latest --tls-verify=false
 ```
 
-Then [deploy/provider.yaml](../deploy/provider.yaml) should use: `image-registry.openshift-image-registry.svc:5000/crossplane-system/aap-crossplane:latest`.
+Then [deploy/provider.yaml](../deploy/provider.yaml) can use: `image-registry.openshift-image-registry.svc:5000/crossplane-system/aap-crossplane:latest`.
 
-**Option B – Push to an external registry** (Quay, Docker Hub, GHCR):
+### Quay.io
+
+With the image already built locally (e.g. `aap-crossplane:latest`):
 
 ```bash
-podman tag aap-crossplane:latest quay.io/<your-org>/aap-crossplane:latest
-podman push quay.io/<your-org>/aap-crossplane:latest
+# Log in (use your Quay password or an encrypted robot token)
+podman login quay.io -u <your-quay-username>
+
+# Tag and push (replace <your-quay-username> with your Quay org or username)
+podman tag aap-crossplane:latest quay.io/<your-quay-username>/aap-crossplane:latest
+podman push quay.io/<your-quay-username>/aap-crossplane:latest
 ```
 
-Edit [deploy/provider.yaml](../deploy/provider.yaml) and set `spec.package` to that image (e.g. `quay.io/<your-org>/aap-crossplane:latest`), then:
+Create the repository **`aap-crossplane`** under your Quay account if it does not exist. Make it **public** so OpenShift can pull without image pull secrets, or add a pull secret to **`crossplane-system`** (see [deploy/provider.yaml](../deploy/provider.yaml) `packagePullSecrets`).
+
+### Other registries
+
+Tag and push the same way, e.g. Docker Hub or GHCR:
+
+```bash
+podman tag aap-crossplane:latest ghcr.io/<org>/aap-crossplane:latest
+podman push ghcr.io/<org>/aap-crossplane:latest
+```
+
+On OpenShift you may need `imageContentSourcePolicy` or mirror config for private registries.
+
+## Point OpenShift at the image
+
+Set [deploy/provider.yaml](../deploy/provider.yaml) **`spec.package`** to your **package** (xpkg) image if you use Crossplane packages, or follow your install flow for the controller image reference. For a direct provider manifest using the controller image you built, use the image URL your cluster can reach (examples above).
+
+Apply (or patch an existing provider):
 
 ```bash
 kubectl apply -f deploy/provider.yaml
+
+# Or patch the existing provider:
+# kubectl patch provider aap-crossplane-provider --type=merge -p '{"spec":{"package":"quay.io/<your-quay-username>/aap-crossplane:latest"}}'
 ```
 
-### Other OpenShift/Kubernetes clusters
+## Verify
 
-- **Push to a registry** your cluster can pull from (e.g. Quay, GHCR, internal registry), then set `spec.package` in [deploy/provider.yaml](../deploy/provider.yaml) to that image (e.g. `quay.io/myorg/aap-crossplane:v0.1.0`).
-- Or use a local registry and configure the cluster to pull from it (e.g. `imageContentSourcePolicy` on OpenShift).
+Crossplane should pull the image and start the provider:
+
+```bash
+oc get provider.pkg.crossplane.io
+oc get pods -n crossplane-system
+```
+
+Expect **`aap-crossplane-provider`** to show **INSTALLED=True** and **HEALTHY=True** once the image is pulled and the provider pod is running.
+
+## Other Kubernetes clusters
+
+Push to any registry the cluster can pull from, then set the provider **`spec.package`** (or equivalent) to that image reference. For local registries, configure node access or mirroring as needed.
 
 ## See also
 
-- [CROSSPLANE-PACKAGE-IMAGE.md](CROSSPLANE-PACKAGE-IMAGE.md) – Why Crossplane needs a **package** image (xpkg), not just the controller image; how to build and push the xpkg.
-- [openshift-deploy.md](../deploy/openshift-deploy.md) – Full OpenShift deploy flow, including Crossplane and AAP credentials.
-- [deploy/provider.yaml](../deploy/provider.yaml) – Provider install manifest; set `spec.package` to the **package** image (see CROSSPLANE-PACKAGE-IMAGE.md).
+- [CROSSPLANE-PACKAGE-IMAGE.md](CROSSPLANE-PACKAGE-IMAGE.md) – Package (xpkg) vs controller image; build and push the xpkg.
+- [openshift-deploy.md](../deploy/openshift-deploy.md) – Full OpenShift deploy (Crossplane, credentials, provider).
+- [deploy/provider.yaml](../deploy/provider.yaml) – Provider install manifest.
