@@ -80,7 +80,8 @@ Or use `./deploy/create-aap-credentials-secret.sh` with `AAP_HOST` and `AAP_TOKE
 ## 5. ProviderConfig and Provider
 
 ```bash
-kubectl apply -f provider/examples/providerconfig.yaml
+kubectl apply -f deploy/providerconfig-default.yaml
+# Equivalent example in the provider scaffold: provider/examples/providerconfig.yaml
 kubectl apply -f deploy/provider.yaml
 ```
 

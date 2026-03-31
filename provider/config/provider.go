@@ -10,6 +10,8 @@ package config
 
 import (
 	_ "embed"
+	"os"
+	"strings"
 
 	ujconfig "github.com/crossplane/upjet/v2/pkg/config"
 
@@ -18,6 +20,9 @@ import (
 	aapInventory   "github.com/crossplane-contrib/provider-aap/config/aap/inventory"
 	aapJob          "github.com/crossplane-contrib/provider-aap/config/aap/job"
 	aapWorkflowJob  "github.com/crossplane-contrib/provider-aap/config/aap/workflow_job"
+	// Experimental resources (blocked on upstream Terraform provider)
+	// aapJobTemplate    "github.com/crossplane-contrib/provider-aap/config/aap/job_template"
+	// aapProject        "github.com/crossplane-contrib/provider-aap/config/aap/project"
 )
 
 const (
@@ -31,9 +36,38 @@ var providerSchema string
 //go:embed provider-metadata.yaml
 var providerMetadata string
 
+// Feature flags for experimental resources (blocked on upstream Terraform provider)
+var (
+	// EnableJobTemplate enables JobTemplate CRD (requires custom TF provider fork)
+	EnableJobTemplate = getEnvBool("ENABLE_JOB_TEMPLATE", false)
+
+	// EnableProject enables Project CRD (requires upstream TF provider support)
+	EnableProject = getEnvBool("ENABLE_PROJECT", false)
+
+	// EnableExperimental enables all experimental features
+	EnableExperimental = getEnvBool("ENABLE_EXPERIMENTAL", false)
+
+	// FeatureFlagDebug enables debug logging for feature flag evaluation
+	FeatureFlagDebug = getEnvBool("FEATURE_FLAG_DEBUG", false)
+)
+
+// getEnvBool reads a boolean environment variable with a default fallback
+func getEnvBool(key string, defaultValue bool) bool {
+	val := os.Getenv(key)
+	if val == "" {
+		return defaultValue
+	}
+	return strings.ToLower(val) == "true" || val == "1"
+}
+
 // GetProvider returns the AAP provider configuration for controller-scoped managed resources
 // (Inventory, Host, Group, Job, WorkflowJob), backed by the discovered controller API base.
 // Gateway v1 and EDA endpoints are documented in ../AAP-HTTP-APIS.md; they are not separate MR kinds here yet.
+//
+// Feature flags control experimental resources (blocked on upstream Terraform provider):
+//   - ENABLE_JOB_TEMPLATE=true - Enable JobTemplate CRD (requires TF provider fork)
+//   - ENABLE_PROJECT=true - Enable Project CRD (requires upstream support)
+//   - ENABLE_EXPERIMENTAL=true - Enable all experimental features
 func GetProvider() *ujconfig.Provider {
 	pc := ujconfig.NewProvider(
 		[]byte(providerSchema),
@@ -48,6 +82,7 @@ func GetProvider() *ujconfig.Provider {
 		),
 	)
 
+	// Core resources (always enabled)
 	for _, configure := range []func(provider *ujconfig.Provider){
 		aapGroup.Configure,
 		aapHost.Configure,
@@ -57,6 +92,24 @@ func GetProvider() *ujconfig.Provider {
 	} {
 		configure(pc)
 	}
+
+	// Experimental resources (gated by feature flags)
+	// Uncomment when Terraform provider adds support
+	/*
+	if EnableJobTemplate || EnableExperimental {
+		if FeatureFlagDebug {
+			fmt.Fprintf(os.Stderr, "[FeatureFlag] JobTemplate enabled\n")
+		}
+		aapJobTemplate.Configure(pc)
+	}
+
+	if EnableProject || EnableExperimental {
+		if FeatureFlagDebug {
+			fmt.Fprintf(os.Stderr, "[FeatureFlag] Project enabled\n")
+		}
+		aapProject.Configure(pc)
+	}
+	*/
 
 	pc.ConfigureResources()
 	return pc

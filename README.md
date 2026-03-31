@@ -26,6 +26,7 @@ This is a prototype for creating a crossplane provider for the Ansible Automatio
   - [Build vs deploy overview](docs/README.md)
   - Build (provider image/package): [Build & push image (Podman)](docs/build/BUILD-PROVIDER-IMAGE.md), [Package image (xpkg)](docs/build/CROSSPLANE-PACKAGE-IMAGE.md)
   - Deploy: [OpenShift (full guide)](docs/deploy/openshift-deploy.md), [Deploy via Quay](docs/deploy/DEPLOY-AAP-PROVIDER-OPENSHIFT.md), [CRC / OpenShift Local](docs/deploy/DEPLOY-ON-CRC.md), [Validate provider vs AAP API](docs/deploy/VALIDATE-AAP-PROVIDER-API.md)
+- [8. Troubleshooting](#8-troubleshooting)
 - [Workflows (CI)](workflows.md)
 
 ---
@@ -166,7 +167,7 @@ oc get pods -n crossplane-system
 
 2. **Create the AAP credentials Secret** in the same namespace as the provider (e.g. `crossplane-system`), with the **gateway root** URL (no `/api/controller` suffix; the embedded Terraform **ansible/aap** client discovers the controller API via `GET {host}/api/`) and an Application Token. See [deploy/aap-credentials-secret.yaml](deploy/aap-credentials-secret.yaml) and `./deploy/create-aap-credentials-secret.sh`. From in-cluster Pods, prefer gateway Service DNS (e.g. `http://aap.<aap-namespace>.svc.cluster.local`).
 
-3. **Create a ProviderConfig** that references this Secret (see [provider/examples/providerconfig.yaml](provider/examples/providerconfig.yaml)). Set `spec.credentials.secretRef` to the Secret name and key above.
+3. **Create a ProviderConfig** that references this Secret: apply [deploy/providerconfig-default.yaml](deploy/providerconfig-default.yaml) (`ProviderConfig` **`default`** → Secret **`aap-credentials`** / key **`credentials`** in **`crossplane-system`**). The same shape lives in [provider/examples/providerconfig.yaml](provider/examples/providerconfig.yaml) for the generated provider repo.
 
 4. **Apply managed resources** (e.g. `Inventory`, `Group`, `Host`) that reference this `ProviderConfig`; the provider will reconcile them against the AAP API.
 
@@ -177,7 +178,7 @@ oc get pods -n crossplane-system
 | 1 | Build the provider from this repo’s scaffold ([BUILD.md](BUILD.md)). |
 | 2 | Deploy AAP on OpenShift via the AAP Operator; create controller instance and obtain AAP URL + token. |
 | 3 | Install Crossplane on OpenShift (Helm or OLM). |
-| 4 | Install the AAP Crossplane provider and create Secret + ProviderConfig. |
+| 4 | Install the AAP Crossplane provider; create Secret ([deploy/aap-credentials-secret.yaml](deploy/aap-credentials-secret.yaml)) and `ProviderConfig` ([deploy/providerconfig-default.yaml](deploy/providerconfig-default.yaml)). |
 | 5 | Create Crossplane MRs (Inventory, Group, etc.) and verify in the AAP UI. |
 
 ### 6.6 References
@@ -195,3 +196,42 @@ Detailed guides are in [`docs/`](docs/), split into **build** (provider image/pa
 - **Build** (provider image/package): [Build & push image (Podman)](docs/build/BUILD-PROVIDER-IMAGE.md), [Package image (xpkg)](docs/build/CROSSPLANE-PACKAGE-IMAGE.md)
 - **Deploy**: [OpenShift (full guide)](docs/deploy/openshift-deploy.md), [Deploy via Quay](docs/deploy/DEPLOY-AAP-PROVIDER-OPENSHIFT.md), [CRC / OpenShift Local](docs/deploy/DEPLOY-ON-CRC.md), [Validate provider vs AAP API](docs/deploy/VALIDATE-AAP-PROVIDER-API.md)
 - **Provider HTTP APIs** (controller v2 vs `/api/gateway/v1/`): [provider/AAP-HTTP-APIS.md](provider/AAP-HTTP-APIS.md)
+
+## 8. Troubleshooting
+
+### Provider will not install (`INSTALLED=False`, unpack / pull errors)
+
+- Point [deploy/provider.yaml](deploy/provider.yaml) **`spec.package`** at a real **package (xpkg)** image your cluster can reach (see [docs/build/CROSSPLANE-PACKAGE-IMAGE.md](docs/build/CROSSPLANE-PACKAGE-IMAGE.md)).
+- **401 / UNAUTHORIZED** from the registry usually means a private repo without **`packagePullSecrets`**, or a placeholder path (e.g. `quay.io/myorg/...`) that is not yours.
+- **Timeouts** to an external registry from in-cluster nodes: push to the **OpenShift internal registry** or fix cluster egress; see [docs/build/BUILD-PROVIDER-IMAGE.md](docs/build/BUILD-PROVIDER-IMAGE.md).
+
+Use `oc describe provider.pkg.crossplane.io aap-crossplane-provider` for the exact condition message.
+
+### Provider installed but unhealthy (`HEALTHY=False`, `cannot establish control of object`)
+
+If the message says a CRD (often **`providerconfigs.aap.crossplane.io`**) is **already controlled by** a **`ProviderRevision`** that no longer exists (e.g. you removed another AAP-related provider such as **`provider-aap`**), the CRD can keep a **stale `ownerReferences`** entry. The new package revision cannot adopt the CRD until that link is cleared.
+
+Check:
+
+```bash
+oc get crd providerconfigs.aap.crossplane.io -o jsonpath='{.metadata.ownerReferences}{"\n"}'
+```
+
+If the listed **`ProviderRevision`** is gone (`oc get providerrevision.pkg.crossplane.io <name>` → NotFound), remove the stale owners (safe while the conflicting revision is absent; you still have **`ProviderConfig`** objects using that CRD):
+
+```bash
+oc patch crd providerconfigs.aap.crossplane.io --type=json \
+  -p='[{"op": "remove", "path": "/metadata/ownerReferences"}]'
+```
+
+Crossplane should then reattach the CRD to the active revision. Re-check **`HEALTHY`** and the provider pod.
+
+### Managed resources never sync / nothing appears in AAP
+
+- Ensure a **`ProviderConfig`** exists that matches **`spec.providerConfigRef`** on your MR (examples use **`default`**). Apply [deploy/providerconfig-default.yaml](deploy/providerconfig-default.yaml) after creating Secret **`aap-credentials`**.
+- If the MR has **no `status`** or never reaches **Ready**, `oc describe` the MR and check provider logs: `oc logs -n crossplane-system -l pkg.crossplane.io/provider=aap-crossplane-provider --tail=100`.
+
+### Credentials and AAP URL
+
+- Secret JSON **`host`** must be the **gateway root** (e.g. `http://aap.<aap-namespace>.svc.cluster.local`) with **no** `/api/controller` suffix so **`GET {host}/api/`** succeeds; see [deploy/aap-credentials-secret.yaml](deploy/aap-credentials-secret.yaml) and [provider/AAP-HTTP-APIS.md](provider/AAP-HTTP-APIS.md).
+- Validate connectivity from the cluster with [docs/deploy/VALIDATE-AAP-PROVIDER-API.md](docs/deploy/VALIDATE-AAP-PROVIDER-API.md) and [deploy/testing-scripts/validate-aap-api-suite-job.yaml](deploy/testing-scripts/validate-aap-api-suite-job.yaml).

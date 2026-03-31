@@ -24,7 +24,7 @@ Steps and manifests for installing Crossplane, creating AAP credentials, install
 | [deploy/DEPLOY-ON-CRC.md](deploy/DEPLOY-ON-CRC.md) | Deploy on CRC / OpenShift Local (UID range, Quay) |
 | [deploy/VALIDATE-AAP-PROVIDER-API.md](deploy/VALIDATE-AAP-PROVIDER-API.md) | Validate provider CRDs vs running AAP API |
 
-**Artifacts:** [deploy/](../deploy/) — Crossplane subscription/Helm values, `provider.yaml`, credentials script, runtime config; API checks: [deploy/testing-scripts/validate-aap-api-suite-job.yaml](../deploy/testing-scripts/validate-aap-api-suite-job.yaml).
+**Artifacts:** [deploy/](../deploy/) — Crossplane subscription/Helm values, `provider.yaml`, [deploy/providerconfig-default.yaml](../deploy/providerconfig-default.yaml) (default `ProviderConfig` for `aap-credentials`), credentials script, runtime config; API checks: [deploy/testing-scripts/validate-aap-api-suite-job.yaml](../deploy/testing-scripts/validate-aap-api-suite-job.yaml).
 
 ## Quick links
 

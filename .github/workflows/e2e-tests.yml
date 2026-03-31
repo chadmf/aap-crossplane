@@ -1,0 +1,121 @@
+name: E2E Tests
+
+on:
+  pull_request:
+    paths:
+      - 'provider/**'
+      - 'examples/**'
+      - 'test/**'
+      - 'hack/**'
+      - '.github/workflows/e2e-tests.yml'
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  e2e-tests:
+    name: End-to-End Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout aap-crossplane
+        uses: actions/checkout@v4
+        with:
+          path: aap-crossplane
+
+      - name: Checkout upjet-provider-template
+        uses: actions/checkout@v4
+        with:
+          repository: crossplane/upjet-provider-template
+          path: upjet-provider-template
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache-dependency-path: |
+            upjet-provider-template/go.sum
+
+      - name: Install goimports
+        run: go install golang.org/x/tools/cmd/goimports@latest
+
+      - name: Set up Kind
+        uses: helm/kind-action@v1
+        with:
+          install_only: true
+          version: v0.20.0
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: 'v3.14.0'
+
+      - name: Prepare provider from template
+        run: |
+          cd upjet-provider-template
+          make submodules
+
+          # Run prepare script
+          PROVIDER_NAME_LOWER=aap \
+          PROVIDER_NAME_NORMAL=AAP \
+          ORGANIZATION_NAME=crossplane-contrib \
+          CRD_ROOT_GROUP=crossplane.io \
+          ./hack/prepare.sh
+
+      - name: Apply AAP scaffold
+        run: |
+          cd aap-crossplane
+          cp -r provider/config/* ../upjet-provider-template/config/
+          cp provider/Makefile.aap ../upjet-provider-template/Makefile.aap
+
+      - name: Merge AAP Makefile
+        run: |
+          cd upjet-provider-template
+          # Insert -include after TERRAFORM_VERSION_VALID check
+          sed -i '/TERRAFORM_VERSION_VALID/a\
+          \
+          # AAP Terraform provider (override template defaults)\
+          -include Makefile.aap' Makefile
+
+      - name: Generate provider code
+        run: |
+          cd upjet-provider-template
+          export PATH="$(go env GOPATH)/bin:$PATH"
+          make generate.init
+          make generate || true  # May fail on first run, post-gen fixes will help
+
+      - name: Apply post-generate fixes
+        run: |
+          cd aap-crossplane
+          PROVIDER_AAP_DIR=../upjet-provider-template ./hack/post-generate-fixes.sh
+
+      - name: Build provider
+        run: |
+          cd upjet-provider-template
+          export PATH="$(go env GOPATH)/bin:$PATH"
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o provider ./cmd/provider
+
+      - name: Run E2E tests
+        env:
+          PROVIDER_AAP_DIR: ${{ github.workspace }}/upjet-provider-template
+          KIND_CLUSTER_NAME: aap-ci-e2e
+        run: |
+          cd aap-crossplane
+          ./test/e2e/run-e2e-tests.sh --cleanup
+
+      - name: Collect logs on failure
+        if: failure()
+        run: |
+          kubectl cluster-info dump --all-namespaces --output-directory=./cluster-dump || true
+          kubectl get all -A || true
+          kubectl describe providers || true
+
+      - name: Upload cluster dump
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cluster-dump
+          path: cluster-dump/
+          retention-days: 7
