@@ -130,6 +130,14 @@ oc get pods -n crossplane-system -l pkg.crossplane.io/provider=aap-crossplane-pr
 
 ### ProviderConfig and credentials
 
+Create the default `ProviderConfig` (after `aap-credentials` exists):
+
+```bash
+oc apply -f deploy/providerconfig-default.yaml
+```
+
+Verify:
+
 ```bash
 oc get providerconfig
 oc describe providerconfig default
@@ -160,6 +168,8 @@ oc logs job/validate-aap-api-suite -n crossplane-system
 Expect **`SUITE COMPLETE.`** Phase 1 expects HTTP 200/302/401 (controller) and 200/302/401/403 (gateway v1). `curl` uses **`-k`** for dev TLS.
 
 ### End-to-end managed resource (optional)
+
+Requires **`ProviderConfig/default`** (see above: `deploy/providerconfig-default.yaml`).
 
 ```bash
 oc apply -f examples/example-inventory.yaml

@@ -1,0 +1,21 @@
+# Default ProviderConfig for the AAP Crossplane provider.
+# Prerequisites: Secret aap-credentials in crossplane-system (see aap-credentials-secret.yaml
+# and create-aap-credentials-secret.sh). JSON key "credentials" must include host (gateway root),
+# token or username/password — same format as the secret examples.
+#
+# Apply:
+#   oc apply -f deploy/providerconfig-default.yaml
+#
+# Example managed resources use providerConfigRef.name: default (see examples/).
+---
+apiVersion: aap.crossplane.io/v1beta1
+kind: ProviderConfig
+metadata:
+  name: default
+spec:
+  credentials:
+    source: Secret
+    secretRef:
+      name: aap-credentials
+      namespace: crossplane-system
+      key: credentials

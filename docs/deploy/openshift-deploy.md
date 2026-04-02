@@ -75,7 +75,7 @@ The AAP provider is built from this repo's scaffold (see [BUILD.md](../../BUILD.
 
    See [deploy/aap-credentials-secret.yaml](../../deploy/aap-credentials-secret.yaml) for details and username/password fallback. Or use `./deploy/create-aap-credentials-secret.sh` (optionally with credentials from `~/.docker/config.json`). Set **`AAP_HOST`** to the **gateway root** (e.g. `http://aap.<ns>.svc.cluster.local`) so **`GET {host}/api/`** succeeds; the embedded Terraform **ansible/aap** provider discovers **`current_version`** (the controller API base, i.e. **`/api/controller/v2/`** on AAP 2.5+). Do **not** append **`/api/controller`** to `host`.
 
-3. **Apply ProviderConfig**: `kubectl apply -f provider/examples/providerconfig.yaml`
+3. **Apply ProviderConfig**: `kubectl apply -f deploy/providerconfig-default.yaml` (references Secret **`aap-credentials`** in **`crossplane-system`**). Same manifest shape as `provider/examples/providerconfig.yaml` in the provider scaffold.
 
 4. **Validate against the AAP API**: Use the combined suite [validate-aap-api-suite-job.yaml](../../deploy/testing-scripts/validate-aap-api-suite-job.yaml) — **internal ingress** + **`Host:`** (CRC), optional **`aap-credentials`** for full discovery. See [provider/AAP-HTTP-APIS.md](../../provider/AAP-HTTP-APIS.md). Then:
 
