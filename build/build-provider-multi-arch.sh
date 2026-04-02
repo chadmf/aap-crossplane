@@ -220,7 +220,11 @@ fi
 # Cleanup
 log_step "Cleanup"
 log_info "Removing temporary build artifacts..."
-rm -f provider-amd64 provider-arm64 "$DOCKERFILE"
+for platform in "${PLATFORM_ARRAY[@]}"; do
+    arch=$(echo "$platform" | cut -d/ -f2)
+    rm -f "provider-${arch}"
+done
+rm -f "$DOCKERFILE"
 
 # Summary
 log_step "Build Summary"
