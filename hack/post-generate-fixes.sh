@@ -33,8 +33,11 @@ fi
 cd "$PROVIDER_DIR"
 log_info "Applying post-generate fixes to $(pwd)"
 
-# Get the module path from go.mod
-MODULE_PATH=$(go mod edit -json | grep -A1 '"Module"' | grep '"Path"' | cut -d'"' -f4)
+# Get the module path (module root: go list; fallback: first ^module line in go.mod)
+MODULE_PATH=$(go list -m -f '{{.Path}}' . 2>/dev/null || true)
+if [[ -z "$MODULE_PATH" ]]; then
+    MODULE_PATH=$(awk '/^module[[:space:]]+/ { print $2; exit }' go.mod 2>/dev/null || true)
+fi
 if [[ -z "$MODULE_PATH" ]]; then
     MODULE_PATH="github.com/crossplane-contrib/provider-aap"
     log_warn "Could not detect module path, using default: $MODULE_PATH"
