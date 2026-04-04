@@ -14,6 +14,9 @@
 # Environment variables:
 #   PROVIDER_AAP_DIR - Path to provider-aap repository (default: ../provider-aap)
 #   PLATFORMS - Comma-separated list of platforms (default: linux/amd64,linux/arm64)
+#
+# Docker without --push uses buildx --load, which supports only one platform; the script
+# loads the first listed platform and still builds all binaries for podman manifest flow.
 
 set -euo pipefail
 
@@ -102,6 +105,9 @@ fi
 log_step "Step 1: Building provider binaries"
 
 IFS=',' read -ra PLATFORM_ARRAY <<< "$PLATFORMS"
+for i in "${!PLATFORM_ARRAY[@]}"; do
+    PLATFORM_ARRAY[$i]=$(echo "${PLATFORM_ARRAY[$i]}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+done
 for platform in "${PLATFORM_ARRAY[@]}"; do
     os=$(echo "$platform" | cut -d/ -f1)
     arch=$(echo "$platform" | cut -d/ -f2)
@@ -143,11 +149,18 @@ log_info "✓ Created $DOCKERFILE"
 log_step "Step 3: Building multi-arch container image"
 
 if [[ "$CONTAINER_CMD" == "docker" ]]; then
+    # --load only supports a single platform; multi-arch local load is not supported by the docker driver.
+    DOCKER_PLATFORMS="$PLATFORMS"
+    if [[ "$PUSH_IMAGE" != "true" ]] && [[ "${#PLATFORM_ARRAY[@]}" -gt 1 ]]; then
+        DOCKER_PLATFORMS="${PLATFORM_ARRAY[0]}"
+        log_warn "Docker buildx cannot --load a multi-platform image. Loading locally for $DOCKER_PLATFORMS only (use --push for: $PLATFORMS)."
+    fi
+
     # Use Docker buildx for multi-arch
     BUILD_ARGS=(
         "buildx"
         "build"
-        "--platform" "$PLATFORMS"
+        "--platform" "$DOCKER_PLATFORMS"
         "-f" "$DOCKERFILE"
         "-t" "$IMAGE_TAG"
     )
@@ -157,7 +170,7 @@ if [[ "$CONTAINER_CMD" == "docker" ]]; then
         log_info "Building and pushing multi-arch image..."
     else
         BUILD_ARGS+=("--load")
-        log_info "Building multi-arch image (local only)..."
+        log_info "Building image for local docker load (platform: $DOCKER_PLATFORMS)..."
     fi
 
     BUILD_ARGS+=(".")
@@ -207,7 +220,11 @@ fi
 # Cleanup
 log_step "Cleanup"
 log_info "Removing temporary build artifacts..."
-rm -f provider-amd64 provider-arm64 "$DOCKERFILE"
+for platform in "${PLATFORM_ARRAY[@]}"; do
+    arch=$(echo "$platform" | cut -d/ -f2)
+    rm -f "provider-${arch}"
+done
+rm -f "$DOCKERFILE"
 
 # Summary
 log_step "Build Summary"

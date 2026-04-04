@@ -193,11 +193,42 @@ oc get pods -n crossplane-system
 Detailed guides are in [`docs/`](docs/), split into **build** (provider image/package) and **deploy** (Crossplane, credentials, provider install):
 
 - [Build vs deploy overview](docs/README.md)
-- **Build** (provider image/package): [Build & push image (Podman)](docs/build/BUILD-PROVIDER-IMAGE.md), [Package image (xpkg)](docs/build/CROSSPLANE-PACKAGE-IMAGE.md)
-- **Deploy**: [OpenShift (full guide)](docs/deploy/openshift-deploy.md), [Deploy via Quay](docs/deploy/DEPLOY-AAP-PROVIDER-OPENSHIFT.md), [CRC / OpenShift Local](docs/deploy/DEPLOY-ON-CRC.md), [Validate provider vs AAP API](docs/deploy/VALIDATE-AAP-PROVIDER-API.md)
+- **Quick Start**: [Multi-Arch Quick Reference](docs/MULTIARCH-QUICK-REFERENCE.md) - 5-minute deployment guide
+- **Build** (provider image/package): 
+  - [Multi-Arch Build Guide](docs/build/MULTIARCH-BUILD.md) - Build for amd64 and arm64
+  - [Build & push image (Podman)](docs/build/BUILD-PROVIDER-IMAGE.md)
+  - [Package image (xpkg)](docs/build/CROSSPLANE-PACKAGE-IMAGE.md)
+- **Deploy**: 
+  - [OpenShift Multi-Arch Deployment](docs/deploy/OPENSHIFT-MULTIARCH-DEPLOYMENT.md) - Complete multi-arch deployment walkthrough
+  - [OpenShift (full guide)](docs/deploy/openshift-deploy.md)
+  - [Deploy via Quay](docs/deploy/DEPLOY-AAP-PROVIDER-OPENSHIFT.md)
+  - [CRC / OpenShift Local](docs/deploy/DEPLOY-ON-CRC.md)
+  - [Validate provider vs AAP API](docs/deploy/VALIDATE-AAP-PROVIDER-API.md)
 - **Provider HTTP APIs** (controller v2 vs `/api/gateway/v1/`): [provider/AAP-HTTP-APIS.md](provider/AAP-HTTP-APIS.md)
 
 ## 8. Troubleshooting
+
+### Provider pod crashes with "Exec format error"
+
+**Symptom**: Provider pod in CrashLoopBackOff with error:
+```
+exec container process `/usr/local/bin/provider`: Exec format error
+```
+
+**Cause**: Architecture mismatch between provider binary and cluster nodes (e.g., arm64 binary on amd64 cluster).
+
+**Solution**: Use the multi-arch image that supports both amd64 and arm64:
+```bash
+oc patch provider aap-crossplane-provider --type=merge -p '{"spec":{"package":"quay.io/cferman/provider-aap:0.1.15-multiarch"}}'
+```
+
+Verify cluster architecture matches:
+```bash
+oc get nodes -o wide  # Check ARCHITECTURE column
+podman manifest inspect quay.io/cferman/provider-aap:0.1.15-multiarch  # Verify multi-arch support
+```
+
+See [Multi-Arch Build Guide](docs/build/MULTIARCH-BUILD.md) for details.
 
 ### Provider will not install (`INSTALLED=False`, unpack / pull errors)
 
